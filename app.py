@@ -9,15 +9,13 @@ CSV_RESULTS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?for
 CSV_QUESTIONS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid=2071758052"
 CSV_USERS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&sheet=Sheet3"
 
-# --- 1. SYSTEM INITIALIZATION (STATE PERSISTENCE) ---
-if "system_initialized" not in st.session_state:
-    st.session_state.system_initialized = True
-    # မပျောက်ပျက်မည့် Results Logs Cache
+# --- 1. SYSTEM INITIALIZATION ---
+if "admin_results_pool" not in st.session_state:
     st.session_state.admin_results_pool = [
         {"Timestamp": "2026-06-26 01:33:00", "Student Username": "Roll1", "Score Obtained": "2/2 Points"}
     ]
-    
-    # Static Backups အကောင့်များ (Google Sheet အလုပ်မလုပ်လျှင်ပင် ဝင်နိုင်ရန်)
+
+if "cached_users" not in st.session_state:
     st.session_state.cached_users = {
         "student": "student123",
         "Roll1": "12345",
@@ -25,8 +23,6 @@ if "system_initialized" not in st.session_state:
         "Roll3": "12345",
         "Roll_01": "12345"
     }
-    
-    # စနစ်စပွင့်ချင်း Cloud Sheets (Sheet3) မှ ကျောင်းသားစာရင်းကို တစ်ကြိမ်တည်း သေချာဆွဲဖတ်ခြင်း
     try:
         df = pd.read_csv(CSV_USERS_URL)
         if not df.empty:
@@ -36,7 +32,6 @@ if "system_initialized" not in st.session_state:
     except:
         pass
 
-# --- 2. DYNAMIC READ FUNCTIONS ---
 def get_results_from_sheet():
     try:
         df = pd.read_csv(CSV_RESULTS_URL)
@@ -66,8 +61,11 @@ def get_questions_from_sheet():
     except:
         return default_questions
 
-# --- 3. APP STRUCTURE & LOGIN CONTROLLER ---
+# --- 2. APP CONFIGURATION ---
 st.set_page_config(page_title="Secure Exam Terminal", page_icon="🔐", layout="centered")
+
+# ကုဒ်သစ် တကယ်အသက်ဝင်မဝင် စစ်ဆေးရန် စာတန်း
+st.caption("⚙️ System Status: Connected | App Build: v3.0 (Anti-Whitespace Upgrade)")
 
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
@@ -79,33 +77,37 @@ if "submitted" not in st.session_state:
     st.session_state.submitted = False
 
 all_questions = get_questions_from_sheet()
-valid_students = st.session_state.cached_users  # Memory ထဲရှိ အကောင့်များအတိုင်း အမြဲသုံးမည်
+valid_students = st.session_state.cached_users
 
 # --- UI DISPLAY LOGIC ---
 if not st.session_state.logged_in:
     st.title("🔐 Secure Online Examination System")
     st.subheader("DCS Production Prototype (Dynamic Authentication Mode)")
     
-    username = st.text_input("Username (Case-sensitive)", key="login_user")
-    password = st.text_input("Password", type="password", key="login_pass")
+    # 💡 .strip() သုံးပြီး Space အလွတ်များကို အလိုအလျောက် ဖျက်ချခြင်း
+    raw_username = st.text_input("Username (Case-sensitive)")
+    raw_password = st.text_input("Password", type="password")
+    
+    username = raw_username.strip()
+    password = raw_password.strip()
     
     if st.button("Secure Login", type="primary"):
-        # 🔒 Hardcoded Admin Bypass (ဘယ်လိုအခြေအနေမျိုးမဆို အက်မင် ဝင်လို့ရရမည်)
+        # 🔒 Hardcoded Admin Bypass
         if username == "admin" and password == "admin123":
             st.session_state.logged_in = True
             st.session_state.user_role = "admin"
             st.session_state.username = "admin"
             st.rerun()
             
-        # 🎓 ကျောင်းသားများ စစ်ဆေးခြင်း
-        elif username in valid_students and str(password).strip() == str(valid_students[username]).strip():
+        # 🎓 Students Login
+        elif username in valid_students and password == str(valid_students[username]).strip():
             st.session_state.logged_in = True
             st.session_state.user_role = "student"
             st.session_state.username = username
             st.session_state.submitted = False
             st.rerun()
         else:
-            st.error("Invalid credentials. Please try again.")
+            st.error(f"Invalid credentials. Entered: '{username}' (Length: {len(username)})")
 else:
     if st.sidebar.button("Log Out"):
         st.session_state.logged_in = False
@@ -114,7 +116,7 @@ else:
         st.session_state.submitted = False
         st.rerun()
         
-    # --- ADMIN CONTROL PANEL ---
+    # --- ADMIN PANEL ---
     if st.session_state.user_role == "admin":
         st.title("👩‍🏫 Admin Control Panel (Secure Mode)")
         
@@ -122,8 +124,6 @@ else:
         
         with tab1:
             st.subheader("🔒 Terminal Live Records")
-            
-            # ဒေတာများ ပေါင်းစည်းပြသခြင်း
             db_data = get_results_from_sheet()
             display_data = list(st.session_state.admin_results_pool)
             
@@ -145,9 +145,9 @@ else:
             correct_opt = st.selectbox("Correct Option", [opt1, opt2, opt3, opt4])
             
             if st.button("Inject into Question Pool"):
-                st.success("🎉 Question configuration simulation completed successfully!")
+                st.success("🎉 Question configuration completed!")
                     
-    # --- STUDENT EXAMINATION TERMINAL ---
+    # --- STUDENT PANEL ---
     elif st.session_state.user_role == "student":
         st.title("✍️ Student Examination Terminal")
         st.write(f"Active Session User: **{st.session_state.username}**")
@@ -175,7 +175,7 @@ else:
                     st.session_state.final_score = score
                     st.rerun()
             else:
-                st.warning("⚠️ မေးခွန်းများ Cloud တွင်းမှ ဆွဲယူနေဆဲ ဖြစ်ပါသည်။ ခေတ္တစောင့်ဆိုင်းပေးပါရန်။")
+                st.warning("⚠️ မေးခွန်းများ ဆွဲယူနေဆဲ ဖြစ်ပါသည်။")
         else:
-            st.success(f"🎉 သင်၏ ရမှတ်မှာ {st.session_state.final_score}/{len(all_questions)} ဖြစ်ပြီး စနစ်မှ သိမ်းဆည်းကာ Lock ချထားပြီး ဖြစ်ပါသည်။")
+            st.success(f"🎉 သင်၏ ရမှတ်မှာ {st.session_state.final_score}/{len(all_questions)} ဖြစ်ပါသည်။")
             st.balloons()
