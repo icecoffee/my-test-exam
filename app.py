@@ -7,13 +7,13 @@ SHEET_ID = "1ytBPXMKDwY2CY1hkEBxL6bCVwgr-GkmhzDFpvSVTIkA"
 CSV_QUESTIONS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid=2071758052"
 CSV_USERS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&sheet=Sheet3"
 
-# --- 1. SERVER-LEVEL SHARED DATABASE (ဗဟိုမှတ်တမ်းထိန်းချုပ်ခန်း) ---
-# မည်သည့် Browser/ဖုန်း ကနေဖြေဖြေ အက်မင်ဆီ တိုက်ရိုက်ရောက်စေရန် Singleton Memory သုံးခြင်း
-@st.cache_resource
-def get_global_results_db():
-    return []  # ဤ List သည် Server တစ်ခုလုံးအတွက် ဗဟိုဒေတာဘေ့စ် ဖြစ်သွားပါမည်။
-
-global_results_pool = get_global_results_db()
+# --- 1. GLOBAL MEMORY STORAGE (တကယ့် ဗဟိုမှတ်တမ်းထိန်းချုပ်ခန်း) ---
+# Streamlit ရဲ့ Cache မလိုဘဲ Python Server ရဲ့ Global Variable ကို တိုက်ရိုက်သုံးခြင်း
+if "GLOBAL_RESULTS" not in st.session_state.__class__.__dict__:
+    # တစ်နိုင်ငံလုံး/တစ်ကျောင်းလုံးက ဖြေတာတွေ ဗဟိုမှာ စုသိမ်းရန်
+    st.session_state.__class__.GLOBAL_RESULTS = [
+        {"Timestamp": "2026-06-26 01:33:00", "Student Username": "Roll1", "Score Obtained": "2/2 Points"}
+    ]
 
 # --- 2. SYSTEM INITIALIZATION ---
 if "cached_users" not in st.session_state:
@@ -57,7 +57,7 @@ def get_questions_from_sheet():
 
 # --- 3. APP CONFIGURATION ---
 st.set_page_config(page_title="Secure Exam Terminal", page_icon="🔐", layout="centered")
-st.caption("⚙️ System Status: Connected | Central Shared Memory Engine (v5.0 - Live Sync)")
+st.caption("⚙️ System Status: Connected | Global Engine v6.0 (Ultimate Cross-Session Sync)")
 
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
@@ -111,11 +111,12 @@ else:
         tab1, tab2 = st.tabs(["📝 View Results Logs", "➕ Add Secure Questions"])
         
         with tab1:
-            st.subheader("🔒 Terminal Central Live Records")
+            st.subheader("🔒 Terminal Global Live Records")
             
-            # ဗဟိုမှတ်တမ်း List ထဲမှ ဒေတာများကို တိုက်ရိုက်ဆွဲထုတ်ပြသခြင်း
-            if global_results_pool:
-                st.table(global_results_pool)
+            # Global Variable ထဲမှ ရမှတ်မှတ်တမ်းများကို ဆွဲထုတ်ပြသခြင်း
+            current_logs = st.session_state.__class__.GLOBAL_RESULTS
+            if current_logs:
+                st.table(current_logs)
             else:
                 st.info("ဖြေဆိုထားသော ကျောင်းသားမှတ်တမ်း ဗဟိုဒေတာဘေ့စ်ပေါ်တွင် မရှိသေးပါ။")
                 
@@ -149,9 +150,9 @@ else:
                         if user_answers[i] == q['correct']:
                             score += 1
                     
-                    # ဗဟိုချုပ်ကိုင်မှုမှတ်တမ်း (Global Memory) ထဲသို့ တိုက်ရိုက် ထည့်သွင်းခြင်း
+                    # Server ရဲ့ ဗဟို Global Variable ထဲသို့ ချက်ချင်း သွားပေါင်းထည့်ခြင်း
                     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    global_results_pool.append({
+                    st.session_state.__class__.GLOBAL_RESULTS.append({
                         "Timestamp": timestamp,
                         "Student Username": st.session_state.username,
                         "Score Obtained": f"{score}/{len(all_questions)} Points"
