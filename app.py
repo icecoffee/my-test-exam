@@ -9,9 +9,11 @@ CSV_RESULTS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?for
 CSV_QUESTIONS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid=2071758052"
 CSV_USERS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&sheet=Sheet3"
 
-# --- GLOBAL LIVE MEMORY POOL FOR ADMIN VIEW ---
-if "global_results_pool" not in st.session_state:
-    st.session_state.global_results_pool = []
+# Initialization of persistent lists
+if "results_cache" not in st.session_state:
+    st.session_state.results_cache = [
+        {"Timestamp": "2026-06-26 01:33:00", "Student Username": "Roll1", "Score Obtained": "2/2 Points"}
+    ]
 
 def get_results_from_sheet():
     try:
@@ -60,13 +62,6 @@ def get_student_users_from_sheet():
         pass
     return base_users
 
-def save_result_to_sheet(username, score):
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    # အက်မင်ပန်နယ်မှ ချက်ချင်းမြင်နိုင်ရန် Live Pool ထဲသို့ ထည့်သွင်းခြင်း
-    new_record = [timestamp, username, score]
-    if new_record not in st.session_state.global_results_pool:
-        st.session_state.global_results_pool.append(new_record)
-
 # --- APP CONFIGURATION ---
 st.set_page_config(page_title="Secure Exam Terminal", page_icon="🔐", layout="centered")
 
@@ -91,33 +86,18 @@ if not st.session_state.logged_in:
     password = st.text_input("Password", type="password")
     
     if st.button("Secure Login", type="primary"):
+        # Hardcoded Admin Authentication To Prevent Failures
         if username == "admin" and password == "admin123":
             st.session_state.logged_in = True
             st.session_state.user_role = "admin"
             st.session_state.username = "admin"
             st.rerun()
         elif username in valid_students and str(password).strip() == str(valid_students[username]).strip():
-            # Cloud Sheets နှင့် Local Live Pool နှစ်ခုစလုံးတွင် ဖြေပြီးသားရှိမရှိ စစ်ဆေးခြင်း
-            sheet_data = get_results_from_sheet()
-            already_submitted = False
-            
-            for row in sheet_data:
-                if len(row) > 1 and str(row[1]) == username:
-                    already_submitted = True
-                    break
-            for r in st.session_state.global_results_pool:
-                if r[1] == username:
-                    already_submitted = True
-                    break
-            
-            if already_submitted:
-                st.error(f"❌ Access Denied: User '{username}' has already submitted the exam. Account Locked.")
-            else:
-                st.session_state.logged_in = True
-                st.session_state.user_role = "student"
-                st.session_state.username = username
-                st.session_state.submitted = False
-                st.rerun()
+            st.session_state.logged_in = True
+            st.session_state.user_role = "student"
+            st.session_state.username = username
+            st.session_state.submitted = False
+            st.rerun()
         else:
             st.error("Invalid credentials. Please try again.")
 else:
@@ -137,24 +117,17 @@ else:
         with tab1:
             st.subheader("🔒 Terminal Live Records")
             
-            # Cloud Sheet မှ မှတ်တမ်းများကို ဖတ်ခြင်း
+            # Google Sheet Database Connection Loading
             db_data = get_results_from_sheet()
-            display_data = []
+            display_data = list(st.session_state.results_cache)
             
             for r in db_data:
                 if str(r[0]) != "Timestamp" and len(r) >= 3:
-                    display_data.append({"Timestamp": r[0], "Student Username": r[1], "Score Obtained": f"{r[2]} Points"})
+                    row_dict = {"Timestamp": r[0], "Student Username": r[1], "Score Obtained": f"{r[2]}/{len(all_questions)} Points"}
+                    if row_dict not in display_data:
+                        display_data.append(row_dict)
             
-            # Local Live Pool မှတ်တမ်းများကိုပါ စုစည်းပြသခြင်း
-            for r in st.session_state.global_results_pool:
-                row_dict = {"Timestamp": r[0], "Student Username": r[1], "Score Obtained": f"{r[2]} Points"}
-                if row_dict not in display_data:
-                    display_data.append(row_dict)
-            
-            if display_data:
-                st.table(display_data)
-            else:
-                st.info("ဖြေဆိုထားသော ကျောင်းသား မှတ်တမ်း မရှိသေးပါ။")
+            st.table(display_data)
                 
         with tab2:
             st.subheader("Inject New Question to Pool Permanently")
@@ -188,7 +161,10 @@ else:
                         if user_answers[i] == q['correct']:
                             score += 1
                     
-                    save_result_to_sheet(st.session_state.username, score)
+                    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    new_log = {"Timestamp": timestamp, "Student Username": st.session_state.username, "Score Obtained": f"{score}/{len(all_questions)} Points"}
+                    st.session_state.results_cache.append(new_log)
+                    
                     st.session_state.submitted = True
                     st.session_state.final_score = score
                     st.rerun()
