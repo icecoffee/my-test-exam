@@ -2,19 +2,41 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 
-# --- GOOGLE SHEET DATABASE CONNECTIVITY ---
+# --- GOOGLE SHEET DATABASE CONFIGIVITY ---
 SHEET_ID = "1ytBPXMKDwY2CY1hkEBxL6bCVwgr-GkmhzDFpvSVTIkA"
 
 CSV_RESULTS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid=0"
 CSV_QUESTIONS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid=2071758052"
 CSV_USERS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&sheet=Sheet3"
 
-# Initialization of persistent lists
-if "results_cache" not in st.session_state:
-    st.session_state.results_cache = [
+# --- 1. SYSTEM INITIALIZATION (STATE PERSISTENCE) ---
+if "system_initialized" not in st.session_state:
+    st.session_state.system_initialized = True
+    # မပျောက်ပျက်မည့် Results Logs Cache
+    st.session_state.admin_results_pool = [
         {"Timestamp": "2026-06-26 01:33:00", "Student Username": "Roll1", "Score Obtained": "2/2 Points"}
     ]
+    
+    # Static Backups အကောင့်များ (Google Sheet အလုပ်မလုပ်လျှင်ပင် ဝင်နိုင်ရန်)
+    st.session_state.cached_users = {
+        "student": "student123",
+        "Roll1": "12345",
+        "Roll2": "12345",
+        "Roll3": "12345",
+        "Roll_01": "12345"
+    }
+    
+    # စနစ်စပွင့်ချင်း Cloud Sheets (Sheet3) မှ ကျောင်းသားစာရင်းကို တစ်ကြိမ်တည်း သေချာဆွဲဖတ်ခြင်း
+    try:
+        df = pd.read_csv(CSV_USERS_URL)
+        if not df.empty:
+            for row in df.values.tolist():
+                if len(row) >= 2 and pd.notna(row[0]) and pd.notna(row[1]):
+                    st.session_state.cached_users[str(row[0]).strip()] = str(row[1]).strip()
+    except:
+        pass
 
+# --- 2. DYNAMIC READ FUNCTIONS ---
 def get_results_from_sheet():
     try:
         df = pd.read_csv(CSV_RESULTS_URL)
@@ -44,25 +66,7 @@ def get_questions_from_sheet():
     except:
         return default_questions
 
-def get_student_users_from_sheet():
-    base_users = {
-        "student": "student123",
-        "Roll1": "12345",
-        "Roll2": "12345",
-        "Roll3": "12345",
-        "Roll_01": "12345"
-    }
-    try:
-        df = pd.read_csv(CSV_USERS_URL)
-        if not df.empty:
-            for row in df.values.tolist():
-                if len(row) >= 2 and pd.notna(row[0]) and pd.notna(row[1]):
-                    base_users[str(row[0]).strip()] = str(row[1]).strip()
-    except:
-        pass
-    return base_users
-
-# --- APP CONFIGURATION ---
+# --- 3. APP STRUCTURE & LOGIN CONTROLLER ---
 st.set_page_config(page_title="Secure Exam Terminal", page_icon="🔐", layout="centered")
 
 if "logged_in" not in st.session_state:
@@ -75,23 +79,25 @@ if "submitted" not in st.session_state:
     st.session_state.submitted = False
 
 all_questions = get_questions_from_sheet()
-valid_students = get_student_users_from_sheet()
+valid_students = st.session_state.cached_users  # Memory ထဲရှိ အကောင့်များအတိုင်း အမြဲသုံးမည်
 
-# --- UI LOGIC ---
+# --- UI DISPLAY LOGIC ---
 if not st.session_state.logged_in:
     st.title("🔐 Secure Online Examination System")
     st.subheader("DCS Production Prototype (Dynamic Authentication Mode)")
     
-    username = st.text_input("Username (Case-sensitive)")
-    password = st.text_input("Password", type="password")
+    username = st.text_input("Username (Case-sensitive)", key="login_user")
+    password = st.text_input("Password", type="password", key="login_pass")
     
     if st.button("Secure Login", type="primary"):
-        # Hardcoded Admin Authentication To Prevent Failures
+        # 🔒 Hardcoded Admin Bypass (ဘယ်လိုအခြေအနေမျိုးမဆို အက်မင် ဝင်လို့ရရမည်)
         if username == "admin" and password == "admin123":
             st.session_state.logged_in = True
             st.session_state.user_role = "admin"
             st.session_state.username = "admin"
             st.rerun()
+            
+        # 🎓 ကျောင်းသားများ စစ်ဆေးခြင်း
         elif username in valid_students and str(password).strip() == str(valid_students[username]).strip():
             st.session_state.logged_in = True
             st.session_state.user_role = "student"
@@ -108,7 +114,7 @@ else:
         st.session_state.submitted = False
         st.rerun()
         
-    # ADMIN PANEL
+    # --- ADMIN CONTROL PANEL ---
     if st.session_state.user_role == "admin":
         st.title("👩‍🏫 Admin Control Panel (Secure Mode)")
         
@@ -117,9 +123,9 @@ else:
         with tab1:
             st.subheader("🔒 Terminal Live Records")
             
-            # Google Sheet Database Connection Loading
+            # ဒေတာများ ပေါင်းစည်းပြသခြင်း
             db_data = get_results_from_sheet()
-            display_data = list(st.session_state.results_cache)
+            display_data = list(st.session_state.admin_results_pool)
             
             for r in db_data:
                 if str(r[0]) != "Timestamp" and len(r) >= 3:
@@ -141,7 +147,7 @@ else:
             if st.button("Inject into Question Pool"):
                 st.success("🎉 Question configuration simulation completed successfully!")
                     
-    # STUDENT PANEL
+    # --- STUDENT EXAMINATION TERMINAL ---
     elif st.session_state.user_role == "student":
         st.title("✍️ Student Examination Terminal")
         st.write(f"Active Session User: **{st.session_state.username}**")
@@ -163,7 +169,7 @@ else:
                     
                     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     new_log = {"Timestamp": timestamp, "Student Username": st.session_state.username, "Score Obtained": f"{score}/{len(all_questions)} Points"}
-                    st.session_state.results_cache.append(new_log)
+                    st.session_state.admin_results_pool.append(new_log)
                     
                     st.session_state.submitted = True
                     st.session_state.final_score = score
