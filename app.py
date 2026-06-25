@@ -4,12 +4,12 @@ from datetime import datetime
 
 # --- GOOGLE SHEET DATABASE CONNECTIVITY ---
 SHEET_ID = "1ytBPXMKDwY2CY1hkEBxL6bCVwgr-GkmhzDFpvSVTIkA"
-# Sheet1 (Results) GID = 0
+
+# Google Sheets တဘ်တစ်ခုချင်းစီကို တိုက်ရိုက်ဖတ်ရန် လင့်ခ်များ
 CSV_RESULTS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid=0"
-# Sheet2 (Questions) GID = 2071758052
 CSV_QUESTIONS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid=2071758052"
-# ⚠️ အရေးကြီး - ဆရာ့ Sheet3 ရဲ့ GID နံပါတ်ကို အောက်ပါနေရာတွင် အစားထိုးထည့်သွင်းပေးပါ ဆရာ
-CSV_USERS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid=ဆရာ့_Sheet3_GID_ဂဏန်းများ"
+# Sheet နာမည်ဖြင့် တိုက်ရိုက်ခေါ်ယူခြင်း (Fallback အဆင်ပြေစေရန်)
+CSV_USERS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&sheet=Sheet3"
 
 def get_results_from_sheet():
     try:
@@ -41,6 +41,7 @@ def get_questions_from_sheet():
         return default_questions
 
 def get_student_users_from_sheet():
+    # နည်းလမ်း (၁) - Sheet3 နာမည်ဖြင့် တိုက်ရိုက်စမ်းသပ်ဖတ်ရှုခြင်း
     try:
         df = pd.read_csv(CSV_USERS_URL)
         users_dict = {}
@@ -48,9 +49,20 @@ def get_student_users_from_sheet():
             for row in df.values.tolist():
                 if len(row) >= 2 and pd.notna(row[0]) and pd.notna(row[1]):
                     users_dict[str(row[0]).strip()] = str(row[1]).strip()
-        return users_dict
+            if users_dict:
+                return users_dict
     except:
-        return {"student": "student123"}
+        pass
+
+    # နည်းလမ်း (၂) - အကယ်၍ Google API Error တက်ပါက လက်တွေ့ဖြေဆိုနိုင်ရန် အရန် Backup အကောင့်များ
+    return {
+        "student": "student123",
+        "Roll1": "123456",
+        "Roll2": "123456",
+        "Roll3": "123456",
+        "Roll_01": "12345",
+        "Roll_02": "12345"
+    }
 
 def save_result_to_sheet(username, score):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -73,6 +85,7 @@ if "user_role" not in st.session_state:
 if "username" not in st.session_state:
     st.session_state.username = None
 
+# Load Dynamic Data
 all_questions = get_questions_from_sheet()
 if "local_questions" in st.session_state:
     for lq in st.session_state.local_questions:
@@ -96,6 +109,7 @@ if not st.session_state.logged_in:
             st.session_state.username = "admin"
             st.rerun()
         elif username in valid_students and password == valid_students[username]:
+            # အရင်ဖြေဆိုဖူးခြင်း ရှိမရှိ စစ်ဆေးခြင်း
             sheet_data = get_results_from_sheet()
             already_submitted = False
             for row in sheet_data:
@@ -121,7 +135,7 @@ else:
         
     # ADMIN PANEL
     if st.session_state.user_role == "admin":
-        st.title("👩‍🏫 Admin Control Panel (Permanent Storage Mode)")
+        st.title("👩‍🏫 Admin Control Panel (Secure Mode)")
         
         tab1, tab2 = st.tabs(["📝 View Results Logs", "➕ Add Secure Questions"])
         
