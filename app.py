@@ -1,14 +1,13 @@
 import streamlit as st
 import pandas as pd
-import requests
 from datetime import datetime
 
 # --- GOOGLE SHEET DATABASE CONNECTIVITY ---
 SHEET_ID = "1ytBPXMKDwY2CY1hkEBxL6bCVwgr-GkmhzDFpvSVTIkA"
-# Sheet1 (Results) အတွက် CSV URL
+# Sheet1 (Results) အတွက် လင့်ခ်
 CSV_RESULTS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid=0"
-# Sheet2 (Questions) အတွက် CSV URL (gid=အသစ်ဆောက်ထားသော Sheet2 ID - များသောအားဖြင့် ဝင်ဖတ်၍ရပါသည်)
-CSV_QUESTIONS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&sheet=Sheet2"
+# Sheet2 (Questions) အတွက် ဆရာ့ Sheet2 ရဲ့ သီးသန့် GID: 2071758052 ကို တိုက်ရိုက်ချိတ်ဆက်ခြင်း
+CSV_QUESTIONS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid=2071758052"
 
 def get_results_from_sheet():
     try:
@@ -18,23 +17,27 @@ def get_results_from_sheet():
         return []
 
 def get_questions_from_sheet():
+    # အရန်စနစ် (Fallback Base Pool) - Sheet ထဲက ဖတ်မရပါက ဤမေးခွန်းများ ပြပေးမည်
+    default_questions = [
+        {"q": "Nuclear shielding matching: Which material is most effective for neutron attenuation?", "options": ["Lead (Pb)", "Water / Paraffin", "Aluminum (Al)", "Copper (Cu)"], "correct": "Water / Paraffin"},
+        {"q": "The 555 Timer IC operating in Astable mode produces which type of output waveform?", "options": ["Sine Wave", "Square Wave", "Triangular Wave", "Sawtooth Wave"], "correct": "Square Wave"}
+    ]
     try:
         df = pd.read_csv(CSV_QUESTIONS_URL)
-        questions = []
-        for row in df.values.tolist():
-            if len(row) >= 6:
-                questions.append({
-                    "q": row[0],
-                    "options": [str(row[1]), str(row[2]), str(row[3]), str(row[4])],
-                    "correct": str(row[5])
-                })
-        return questions
+        if not df.empty:
+            sheet_questions = []
+            for row in df.values.tolist():
+                if len(row) >= 6 and pd.notna(row[0]):
+                    sheet_questions.append({
+                        "q": str(row[0]),
+                        "options": [str(row[1]), str(row[2]), str(row[3]), str(row[4])],
+                        "correct": str(row[5])
+                    })
+            if sheet_questions:
+                return sheet_questions
+        return default_questions
     except:
-        # Sheet ထဲက ဖတ်မရပါက Default အနေဖြင့် ထားရှိခြင်း
-        return [
-            {"q": "Nuclear shielding matching: Which material is most effective for neutron attenuation?", "options": ["Lead (Pb)", "Water / Paraffin", "Aluminum (Al)", "Copper (Cu)"], "correct": "Water / Paraffin"},
-            {"q": "The 555 Timer IC operating in Astable mode produces which type of output waveform?", "options": ["Sine Wave", "Square Wave", "Triangular Wave", "Sawtooth Wave"], "correct": "Square Wave"}
-        ]
+        return default_questions
 
 def save_result_to_sheet(username, score):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -57,7 +60,7 @@ if "user_role" not in st.session_state:
 if "username" not in st.session_state:
     st.session_state.username = None
 
-# Load Dynamic Questions from Google Sheets
+# Load Dynamic Questions
 all_questions = get_questions_from_sheet()
 if "local_questions" in st.session_state:
     for lq in st.session_state.local_questions:
