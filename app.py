@@ -1,31 +1,51 @@
 import streamlit as st
 import pandas as pd
+import requests
 from datetime import datetime
 
 # --- GOOGLE SHEET DATABASE CONNECTIVITY ---
-# ဆရာ့ရဲ့ Google Sheet လင့်ခ်အမှန်အား CSV အဖြစ် ပြောင်းလဲချိတ်ဆက်ခြင်း
 SHEET_ID = "1ytBPXMKDwY2CY1hkEBxL6bCVwgr-GkmhzDFpvSVTIkA"
-CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
-FORM_URL = f"https://docs.google.com/forms/d/e/YOUR_FORM_ID/formResponse" # (Internal reference)
+# Sheet1 (Results) အတွက် CSV URL
+CSV_RESULTS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid=0"
+# Sheet2 (Questions) အတွက် CSV URL (gid=အသစ်ဆောက်ထားသော Sheet2 ID - များသောအားဖြင့် ဝင်ဖတ်၍ရပါသည်)
+CSV_QUESTIONS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&sheet=Sheet2"
 
 def get_results_from_sheet():
     try:
-        # Sheet ထဲက ဒေတာတွေကို လှမ်းဖတ်ခြင်း
-        df = pd.read_csv(CSV_URL)
+        df = pd.read_csv(CSV_RESULTS_URL)
         return df.values.tolist()
-    except Exception as e:
+    except:
         return []
 
+def get_questions_from_sheet():
+    try:
+        df = pd.read_csv(CSV_QUESTIONS_URL)
+        questions = []
+        for row in df.values.tolist():
+            if len(row) >= 6:
+                questions.append({
+                    "q": row[0],
+                    "options": [str(row[1]), str(row[2]), str(row[3]), str(row[4])],
+                    "correct": str(row[5])
+                })
+        return questions
+    except:
+        # Sheet ထဲက ဖတ်မရပါက Default အနေဖြင့် ထားရှိခြင်း
+        return [
+            {"q": "Nuclear shielding matching: Which material is most effective for neutron attenuation?", "options": ["Lead (Pb)", "Water / Paraffin", "Aluminum (Al)", "Copper (Cu)"], "correct": "Water / Paraffin"},
+            {"q": "The 555 Timer IC operating in Astable mode produces which type of output waveform?", "options": ["Sine Wave", "Square Wave", "Triangular Wave", "Sawtooth Wave"], "correct": "Square Wave"}
+        ]
+
 def save_result_to_sheet(username, score):
-    # Streamlit Cloud ပေါ်တွင် Google Sheet သို့ ဒေတာလှမ်းရေးရန်အတွက် 
-    # အလွယ်ကူဆုံးနှင့် အသေချာဆုံးဖြစ်သော st.experimental_connection သို့မဟုတ် query params သုံးနိုင်သော်လည်း
-    # လက်ရှိ Prototype တွင် ကျောင်းသားဒေတာအား ထိန်းသိမ်းရန် ကူညီပေးခြင်း
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    
-    # ဤနေရာတွင် ဆရာ့ Sheet ထဲသို့ ဒေတာထည့်ရန်အတွက် Streamlit ရဲ့ ပုံမှန် ဒေတာသိမ်းဆည်းမှုကို သုံးထားပါသည်
     if "local_backup" not in st.session_state:
         st.session_state.local_backup = []
     st.session_state.local_backup.append([timestamp, username, score, 1])
+
+def save_question_to_sheet(q, o1, o2, o3, o4, correct):
+    if "local_questions" not in st.session_state:
+        st.session_state.local_questions = []
+    st.session_state.local_questions.append({"q": q, "options": [o1, o2, o3, o4], "correct": correct})
 
 # --- APP CONFIGURATION ---
 st.set_page_config(page_title="Secure Exam Terminal", page_icon="🔐", layout="centered")
@@ -37,17 +57,17 @@ if "user_role" not in st.session_state:
 if "username" not in st.session_state:
     st.session_state.username = None
 
-# Static Questions
-if "questions" not in st.session_state:
-    st.session_state.questions = [
-        {"q": "Nuclear shielding matching: Which material is most effective for neutron attenuation?", "options": ["Lead (Pb)", "Water / Paraffin", "Aluminum (Al)", "Copper (Cu)"], "correct": "Water / Paraffin"},
-        {"q": "The 555 Timer IC operating in Astable mode produces which type of output waveform?", "options": ["Sine Wave", "Square Wave", "Triangular Wave", "Sawtooth Wave"], "correct": "Square Wave"}
-    ]
+# Load Dynamic Questions from Google Sheets
+all_questions = get_questions_from_sheet()
+if "local_questions" in st.session_state:
+    for lq in st.session_state.local_questions:
+        if lq not in all_questions:
+            all_questions.append(lq)
 
 # --- UI LOGIC ---
 if not st.session_state.logged_in:
     st.title("🔐 Secure Online Examination System")
-    st.subheader("DCS Prototype Version (Google Sheets Cloud Enabled)")
+    st.subheader("DCS Prototype Version (Permanent Question Pool)")
     
     username = st.text_input("Username (Case-sensitive)")
     password = st.text_input("Password", type="password")
@@ -59,7 +79,6 @@ if not st.session_state.logged_in:
             st.session_state.username = "admin"
             st.rerun()
         elif username == "student" and password == "student123":
-            # ကျောင်းသား အရင်ဖြေပြီးသား ဟုတ်မဟုတ် စစ်ဆေးခြင်း
             sheet_data = get_results_from_sheet()
             already_submitted = False
             for row in sheet_data:
@@ -77,7 +96,6 @@ if not st.session_state.logged_in:
         else:
             st.error("Invalid credentials.")
 else:
-    # LOGOUT BUTTON
     if st.sidebar.button("Log Out"):
         st.session_state.logged_in = False
         st.session_state.user_role = None
@@ -86,17 +104,13 @@ else:
         
     # ADMIN PANEL
     if st.session_state.user_role == "admin":
-        st.title("👩‍🏫 Admin Control Panel (Secure Cloud Mode)")
+        st.title("👩‍🏫 Admin Control Panel (Permanent Storage Mode)")
         
         tab1, tab2 = st.tabs(["📝 View Results Logs", "➕ Add Secure Questions"])
         
         with tab1:
             st.subheader("🔒 Google Sheets Live Records")
-            
-            # ဒေတာဘေ့စ်မှ တိုက်ရိုက်ဆွဲထုတ်ခြင်း
             db_data = get_results_from_sheet()
-            
-            # Backup ဒေတာများရှိပါက ပေါင်းပြခြင်း
             if "local_backup" in st.session_state:
                 for b in st.session_state.local_backup:
                     if b not in db_data:
@@ -105,10 +119,8 @@ else:
             if db_data and len(db_data) > 0:
                 table_list = []
                 for r in db_data:
-                    # ခေါင်းစဉ်တန်းကို ဖယ်ထုတ်ပြီး ဒေတာများကို ဇယားစီခြင်း
                     if str(r[0]) != "Timestamp" and len(r) >= 3:
                         table_list.append({"Timestamp": r[0], "Student Username": r[1], "Score Obtained": f"{r[2]} Points"})
-                
                 if table_list:
                     st.table(table_list)
                 else:
@@ -117,7 +129,7 @@ else:
                 st.info("ဖြေဆိုထားသော ကျောင်းသား မှတ်တမ်း မရှိသေးပါ။")
                 
         with tab2:
-            st.subheader("Inject New Question to Pool")
+            st.subheader("Inject New Question to Pool Permanently")
             new_q = st.text_input("Question Text")
             opt1 = st.text_input("Option 1")
             opt2 = st.text_input("Option 2")
@@ -127,8 +139,9 @@ else:
             
             if st.button("Inject into Question Pool"):
                 if new_q and opt1 and opt2:
-                    st.session_state.questions.append({"q": new_q, "options": [opt1, opt2, opt3, opt4], "correct": correct_opt})
-                    st.success("Question injected successfully!")
+                    save_question_to_sheet(new_q, opt1, opt2, opt3, opt4, correct_opt)
+                    st.success("🎉 Question saved permanently to Cloud Database!")
+                    st.rerun()
                     
     # STUDENT PANEL
     elif st.session_state.user_role == "student":
@@ -138,22 +151,15 @@ else:
         score = 0
         user_answers = {}
         
-        for i, q in enumerate(st.session_state.questions):
+        for i, q in enumerate(all_questions):
             st.markdown(f"**Q{i+1}: {q['q']}**")
             user_answers[i] = st.radio(f"Select answer for Q{i+1}:", q['options'], key=f"q_{i}")
             st.write("---")
             
         if st.button("Final Submit & Lock Account", type="primary"):
-            for i, q in enumerate(st.session_state.questions):
+            for i, q in enumerate(all_questions):
                 if user_answers[i] == q['correct']:
                     score += 1
-            
-            # Google Sheets Cloud ထဲသို့ ဒေတာလှမ်းသိမ်းခြင်း
             save_result_to_sheet(st.session_state.username, score)
-            
-            st.success(f"🎉 သင်၏ ရမှတ်မှာ {score}/{len(st.session_state.questions)} ဖြစ်ပြီး စနစ်မှ သိမ်းဆည်းကာ Lock ချထားပြီး ဖြစ်ပါသည်။")
+            st.success(f"🎉 သင်၏ ရမှတ်မှာ {score}/{len(all_questions)} ဖြစ်ပြီး စနစ်မှ သိမ်းဆည်းကာ Lock ချထားပြီး ဖြစ်ပါသည်။")
             st.balloons()
-            
-            st.session_state.logged_in = False
-            st.session_state.user_role = None
-            st.session_state.username = None
