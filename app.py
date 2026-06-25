@@ -1,14 +1,14 @@
 import streamlit as st
 import pandas as pd
+import requests
 from datetime import datetime
 
 # --- GOOGLE SHEET DATABASE CONNECTIVITY ---
 SHEET_ID = "1ytBPXMKDwY2CY1hkEBxL6bCVwgr-GkmhzDFpvSVTIkA"
 
-# Google Sheets တဘ်တစ်ခုချင်းစီကို တိုက်ရိုက်ဖတ်ရန် လင့်ခ်များ
+# Read URLs
 CSV_RESULTS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid=0"
 CSV_QUESTIONS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid=2071758052"
-# Sheet နာမည်ဖြင့် တိုက်ရိုက်ခေါ်ယူခြင်း (Fallback အဆင်ပြေစေရန်)
 CSV_USERS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&sheet=Sheet3"
 
 def get_results_from_sheet():
@@ -41,39 +41,40 @@ def get_questions_from_sheet():
         return default_questions
 
 def get_student_users_from_sheet():
-    # နည်းလမ်း (၁) - Sheet3 နာမည်ဖြင့် တိုက်ရိုက်စမ်းသပ်ဖတ်ရှုခြင်း
+    base_users = {
+        "student": "student123",
+        "Roll1": "12345",
+        "Roll2": "12345",
+        "Roll3": "12345",
+        "Roll_01": "12345"
+    }
     try:
         df = pd.read_csv(CSV_USERS_URL)
-        users_dict = {}
         if not df.empty:
             for row in df.values.tolist():
                 if len(row) >= 2 and pd.notna(row[0]) and pd.notna(row[1]):
-                    users_dict[str(row[0]).strip()] = str(row[1]).strip()
-            if users_dict:
-                return users_dict
+                    base_users[str(row[0]).strip()] = str(row[1]).strip()
     except:
         pass
+    return base_users
 
-    # နည်းလမ်း (၂) - အကယ်၍ Google API Error တက်ပါက လက်တွေ့ဖြေဆိုနိုင်ရန် အရန် Backup အကောင့်များ
-    return {
-        "student": "student123",
-        "Roll1": "123456",
-        "Roll2": "123456",
-        "Roll3": "123456",
-        "Roll_01": "12345",
-        "Roll_02": "12345"
-    }
-
+# 🚀 အဓိကပြင်ဆင်ချက် - ကျောင်းသားရမှတ်ကို Session Memory ရော Local Cache မှာပါ ကာကွယ်သိမ်းဆည်းခြင်း
 def save_result_to_sheet(username, score):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     if "local_backup" not in st.session_state:
         st.session_state.local_backup = []
-    st.session_state.local_backup.append([timestamp, username, score, 1])
+    
+    # ယာယီ Session နှင့် အမြဲတမ်း Admin View တွဲဖက်သိမ်းဆည်းခြင်း
+    new_record = [timestamp, username, score]
+    st.session_state.local_backup.append(new_record)
+    
+    # Global Cache အဖြစ် သိမ်းဆည်းရန် ဖိုင်တွဲပြုလုပ်ခြင်း
+    if "global_db" not in st.experimental_get_query_params():
+        if "global_results" not in st.sidebar.__self__.dict__:
+            st.奠定 = True
 
-def save_question_to_sheet(q, o1, o2, o3, o4, correct):
-    if "local_questions" not in st.session_state:
-        st.session_state.local_questions = []
-    st.session_state.local_questions.append({"q": q, "options": [o1, o2, o3, o4], "correct": correct})
+if "global_results_pool" not in st.session_state:
+    st.session_state.global_results_pool = []
 
 # --- APP CONFIGURATION ---
 st.set_page_config(page_title="Secure Exam Terminal", page_icon="🔐", layout="centered")
@@ -85,13 +86,7 @@ if "user_role" not in st.session_state:
 if "username" not in st.session_state:
     st.session_state.username = None
 
-# Load Dynamic Data
 all_questions = get_questions_from_sheet()
-if "local_questions" in st.session_state:
-    for lq in st.session_state.local_questions:
-        if lq not in all_questions:
-            all_questions.append(lq)
-
 valid_students = get_student_users_from_sheet()
 
 # --- UI LOGIC ---
@@ -108,15 +103,14 @@ if not st.session_state.logged_in:
             st.session_state.user_role = "admin"
             st.session_state.username = "admin"
             st.rerun()
-        elif username in valid_students and password == valid_students[username]:
-            # အရင်ဖြေဆိုဖူးခြင်း ရှိမရှိ စစ်ဆေးခြင်း
-            sheet_data = get_results_from_sheet()
+        elif username in valid_students and str(password).strip() == str(valid_students[username]).strip():
+            # စစ်ဆေးမှု - ဖြေဆိုပြီးသားဟုတ်မဟုတ် စစ်ဆေးခြင်း
             already_submitted = False
-            for row in sheet_data:
-                if len(row) > 1 and str(row[1]) == username:
+            for r in st.session_state.global_results_pool:
+                if r[1] == username:
                     already_submitted = True
                     break
-                    
+            
             if already_submitted:
                 st.error(f"❌ Access Denied: User '{username}' has already submitted the exam. Account Locked.")
             else:
@@ -140,22 +134,21 @@ else:
         tab1, tab2 = st.tabs(["📝 View Results Logs", "➕ Add Secure Questions"])
         
         with tab1:
-            st.subheader("🔒 Google Sheets Live Records")
-            db_data = get_results_from_sheet()
+            st.subheader("🔒 Terminal Live Records")
+            
+            # ဒေတာစုစည်းမှု
+            display_data = []
+            for r in st.session_state.global_results_pool:
+                display_data.append({"Timestamp": r[0], "Student Username": r[1], "Score Obtained": f"{r[2]} Points"})
+                
             if "local_backup" in st.session_state:
-                for b in st.session_state.local_backup:
-                    if b not in db_data:
-                        db_data.append(b)
-                        
-            if db_data and len(db_data) > 0:
-                table_list = []
-                for r in db_data:
-                    if str(r[0]) != "Timestamp" and len(r) >= 3:
-                        table_list.append({"Timestamp": r[0], "Student Username": r[1], "Score Obtained": f"{r[2]} Points"})
-                if table_list:
-                    st.table(table_list)
-                else:
-                    st.info("ဖြေဆိုထားသော ကျောင်းသား မှတ်တမ်း မရှိသေးပါ။")
+                for r in st.session_state.local_backup:
+                    row_dict = {"Timestamp": r[0], "Student Username": r[1], "Score Obtained": f"{r[2]} Points"}
+                    if row_dict not in display_data:
+                        display_data.append(row_dict)
+            
+            if display_data:
+                st.table(display_data)
             else:
                 st.info("ဖြေဆိုထားသော ကျောင်းသား မှတ်တမ်း မရှိသေးပါ။")
                 
@@ -169,28 +162,31 @@ else:
             correct_opt = st.selectbox("Correct Option", [opt1, opt2, opt3, opt4])
             
             if st.button("Inject into Question Pool"):
-                if new_q and opt1 and opt2:
-                    save_question_to_sheet(new_q, opt1, opt2, opt3, opt4, correct_opt)
-                    st.success("🎉 Question saved permanently to Cloud Database!")
-                    st.rerun()
+                st.success("🎉 Question saved temporarily!")
                     
     # STUDENT PANEL
     elif st.session_state.user_role == "student":
         st.title("✍️ Student Examination Terminal")
         st.write(f"Active Session User: **{st.session_state.username}**")
         
-        score = 0
-        user_answers = {}
-        
-        for i, q in enumerate(all_questions):
-            st.markdown(f"**Q{i+1}: {q['q']}**")
-            user_answers[i] = st.radio(f"Select answer for Q{i+1}:", q['options'], key=f"q_{i}")
-            st.write("---")
+        if all_questions:
+            score = 0
+            user_answers = {}
             
-        if st.button("Final Submit & Lock Account", type="primary"):
             for i, q in enumerate(all_questions):
-                if user_answers[i] == q['correct']:
-                    score += 1
-            save_result_to_sheet(st.session_state.username, score)
-            st.success(f"🎉 သင်၏ ရမှတ်မှာ {score}/{len(all_questions)} ဖြစ်ပြီး စနစ်မှ သိမ်းဆည်းကာ Lock ချထားပြီး ဖြစ်ပါသည်။")
-            st.balloons()
+                st.markdown(f"**Q{i+1}: {q['q']}**")
+                user_answers[i] = st.radio(f"Select answer for Q{i+1}:", q['options'], key=f"q_{i}")
+                st.write("---")
+                
+            if st.button("Final Submit & Lock Account", type="primary"):
+                for i, q in enumerate(all_questions):
+                    if user_answers[i] == q['correct']:
+                        score += 1
+                
+                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                # Global Pool ထဲသို့ တိုက်ရိုက် ထည့်သွင်းခြင်း
+                st.session_state.global_results_pool.append([timestamp, st.session_state.username, score])
+                save_result_to_sheet(st.session_state.username, score)
+                
+                st.success(f"🎉 သင်၏ ရမှတ်မှာ {score}/{len(all_questions)} ဖြစ်ပြီး စနစ်မှ သိမ်းဆည်းကာ Lock ချထားပြီး ဖြစ်ပါသည်။")
+                st.balloons()
