@@ -1,17 +1,21 @@
 import streamlit as st
 import pandas as pd
-import requests
 from datetime import datetime
 
 # --- GOOGLE SHEET DATABASE CONFIGIVITY ---
 SHEET_ID = "1ytBPXMKDwY2CY1hkEBxL6bCVwgr-GkmhzDFpvSVTIkA"
-
-# Google Sheet မှ Data များ ဆွဲဖတ်ရန် URL များ
-CSV_RESULTS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid=0"
 CSV_QUESTIONS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid=2071758052"
 CSV_USERS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&sheet=Sheet3"
 
-# --- 1. SYSTEM INITIALIZATION ---
+# --- 1. SERVER-LEVEL SHARED DATABASE (ဗဟိုမှတ်တမ်းထိန်းချုပ်ခန်း) ---
+# မည်သည့် Browser/ဖုန်း ကနေဖြေဖြေ အက်မင်ဆီ တိုက်ရိုက်ရောက်စေရန် Singleton Memory သုံးခြင်း
+@st.cache_resource
+def get_global_results_db():
+    return []  # ဤ List သည် Server တစ်ခုလုံးအတွက် ဗဟိုဒေတာဘေ့စ် ဖြစ်သွားပါမည်။
+
+global_results_pool = get_global_results_db()
+
+# --- 2. SYSTEM INITIALIZATION ---
 if "cached_users" not in st.session_state:
     st.session_state.cached_users = {
         "student": "student123",
@@ -28,15 +32,6 @@ if "cached_users" not in st.session_state:
                     st.session_state.cached_users[str(row[0]).strip()] = str(row[1]).strip()
     except:
         pass
-
-def get_results_from_sheet():
-    try:
-        # Cache ငြိခြင်းမှ ကာကွယ်ရန် Parameter တစ်ခု ထည့်သွင်းဖတ်ရှုခြင်း
-        nocache_url = f"{CSV_RESULTS_URL}&_cb={datetime.now().timestamp()}"
-        df = pd.read_csv(nocache_url)
-        return df.values.tolist()
-    except:
-        return []
 
 def get_questions_from_sheet():
     default_questions = [
@@ -60,9 +55,9 @@ def get_questions_from_sheet():
     except:
         return default_questions
 
-# --- 2. APP CONFIGURATION ---
+# --- 3. APP CONFIGURATION ---
 st.set_page_config(page_title="Secure Exam Terminal", page_icon="🔐", layout="centered")
-st.caption("⚙️ System Status: Connected | Cloud Synced Real-time Engine (v4.5)")
+st.caption("⚙️ System Status: Connected | Central Shared Memory Engine (v5.0 - Live Sync)")
 
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
@@ -116,24 +111,13 @@ else:
         tab1, tab2 = st.tabs(["📝 View Results Logs", "➕ Add Secure Questions"])
         
         with tab1:
-            st.subheader("🔒 Google Sheets Cloud Live Records")
+            st.subheader("🔒 Terminal Central Live Records")
             
-            # Cloud Database မှ ဒေတာ တိုက်ရိုက်ဆွဲဖတ်ခြင်း
-            db_data = get_results_from_sheet()
-            display_data = []
-            
-            for r in db_data:
-                if len(r) >= 3 and str(r[0]) != "Timestamp" and pd.notna(r[0]):
-                    display_data.append({
-                        "Timestamp": str(r[0]),
-                        "Student Username": str(r[1]),
-                        "Score Obtained": f"{r[2]} Points"
-                    })
-            
-            if display_data:
-                st.table(display_data)
+            # ဗဟိုမှတ်တမ်း List ထဲမှ ဒေတာများကို တိုက်ရိုက်ဆွဲထုတ်ပြသခြင်း
+            if global_results_pool:
+                st.table(global_results_pool)
             else:
-                st.info("ဖြေဆိုထားသော ကျောင်းသားမှတ်တမ်း Cloud ပေါ်တွင် မရှိသေးပါ။")
+                st.info("ဖြေဆိုထားသော ကျောင်းသားမှတ်တမ်း ဗဟိုဒေတာဘေ့စ်ပေါ်တွင် မရှိသေးပါ။")
                 
         with tab2:
             st.subheader("Inject New Question to Pool Permanently")
@@ -142,8 +126,6 @@ else:
             opt2 = st.text_input("Option 2")
             opt3 = st.text_input("Option 3")
             opt4 = st.text_input("Option 4")
-            correct_opt = st.selectbox("Correct Option", [opt1, opt2, opt3, opt4])
-            
             if st.button("Inject into Question Pool"):
                 st.success("🎉 Question configuration completed!")
                     
@@ -166,6 +148,14 @@ else:
                     for i, q in enumerate(all_questions):
                         if user_answers[i] == q['correct']:
                             score += 1
+                    
+                    # ဗဟိုချုပ်ကိုင်မှုမှတ်တမ်း (Global Memory) ထဲသို့ တိုက်ရိုက် ထည့်သွင်းခြင်း
+                    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    global_results_pool.append({
+                        "Timestamp": timestamp,
+                        "Student Username": st.session_state.username,
+                        "Score Obtained": f"{score}/{len(all_questions)} Points"
+                    })
                     
                     st.session_state.submitted = True
                     st.session_state.final_score = score
