@@ -1,145 +1,150 @@
 import streamlit as st
-import hashlib
-import datetime
+import sqlite3
+import os
+from datetime import datetime
 
-def hash_password(password):
-    return hashlib.sha256(password.encode()).hexdigest()
+# --- DATABASE SETUP (ကွန်ပျူတာထဲတွင် အမြဲတမ်းသိမ်းဆည်းမည့် စနစ်) ---
+DB_FILE = "exam_records.db"
 
-ADMIN_HASH = hash_password("admin123")
-STUDENT_HASH = hash_password("student123")
+def init_db():
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    # ကျောင်းသားမှတ်တမ်းဇယားဆောက်ခြင်း
+    c.execute('''CREATE TABLE IF NOT EXISTS results 
+                 (timestamp TEXT, username TEXT, score INTEGER, submitted INTEGER)''')
+    conn.commit()
+    conn.close()
 
-if "users" not in st.session_state:
-    st.session_state.users = {
-        "admin": {"password": ADMIN_HASH, "role": "admin"},
-        "student": {"password": STUDENT_HASH, "role": "student"}
-    }
+def save_result(username, score):
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    c.execute("INSERT INTO results VALUES (?, ?, ?, 1)", (timestamp, username, score))
+    conn.commit()
+    conn.close()
 
-if "questions" not in st.session_state:
-    st.session_state.questions = [
-        {
-            "question": "Which shielding material is best for high-energy Gamma-rays?",
-            "options": ["Aluminum", "Lead", "Plastic", "Water"],
-            "answer": "Lead"
-        },
-        {
-            "question": "What is the core active element inside a 555 Timer IC?",
-            "options": ["Microcontroller", "Op-Amps and Flip-Flop", "Inductor", "Transformer"],
-            "answer": "Op-Amps and Flip-Flop"
-        }
-    ]
+def get_results():
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("SELECT timestamp, username, score FROM results")
+    rows = c.fetchall()
+    conn.close()
+    return rows
 
-if "submitted_students" not in st.session_state:
-    st.session_state.submitted_students = {}
+# Database စတင်ပွင့်စေခြင်း
+init_db()
+
+# --- APP CONFIGURATION ---
+st.set_page_config(page_title="Secure Exam Terminal", page_icon="🔐", layout="centered")
 
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
+if "user_role" not in st.session_state:
+    st.session_state.user_role = None
+if "username" not in st.session_state:
     st.session_state.username = None
-    st.session_state.role = None
 
-st.set_page_config(page_title="Secure Exam System", page_icon="🔐", layout="centered")
+# Static Questions
+if "questions" not in st.session_state:
+    st.session_state.questions = [
+        {"q": "Nuclear shielding matching: Which material is most effective for neutron attenuation?", "options": ["Lead (Pb)", "Water / Paraffin", "Aluminum (Al)", "Copper (Cu)"], "correct": "Water / Paraffin"},
+        {"q": "The 555 Timer IC operating in Astable mode produces which type of output waveform?", "options": ["Sine Wave", "Square Wave", "Triangular Wave", "Sawtooth Wave"], "correct": "Square Wave"}
+    ]
 
-def logout():
-    st.session_state.logged_in = False
-    st.session_state.username = None
-    st.session_state.role = None
-    st.rerun()
-
+# --- UI LOGIC ---
 if not st.session_state.logged_in:
     st.title("🔐 Secure Online Examination System")
-    st.write("DCS Prototype Version (High Security Enabled)")
-    st.markdown("---")
+    st.subheader("DCS Prototype Version (High Security Enabled)")
     
-    username = st.text_input("Username (Case-sensitive)").strip()
+    username = st.text_input("Username (Case-sensitive)")
     password = st.text_input("Password", type="password")
     
     if st.button("Secure Login", type="primary"):
-        if username in st.session_state.users:
-            entered_hash = hash_password(password)
-            correct_hash = st.session_state.users[username]["password"]
+        if username == "admin" and password == "admin123":
+            st.session_state.logged_in = True
+            st.session_state.user_role = "admin"
+            st.session_state.username = "admin"
+            st.rerun()
+        elif username == "student" and password == "student123":
+            # ကျောင်းသား အရင်ဖြေပြီးသား ဟုတ်မဟုတ် DB တွင်စစ်ဆေးခြင်း
+            conn = sqlite3.connect(DB_FILE)
+            c = conn.cursor()
+            c.execute("SELECT * FROM results WHERE username=?", (username,))
+            already_submitted = c.fetchone()
+            conn.close()
             
-            if entered_hash == correct_hash:
+            if already_submitted:
+                st.error("❌ Access Denied: You have already submitted your exam. Account is locked.")
+            else:
                 st.session_state.logged_in = True
+                st.session_state.user_role = "student"
                 st.session_state.username = username
-                st.session_state.role = st.session_state.users[username]["role"]
-                st.success("Authentication Successful!")
                 st.rerun()
+        else:
+            st.error("Invalid credentials.")
+else:
+    # LOGOUT BUTTON
+    if st.sidebar.button("Log Out"):
+        st.session_state.logged_in = False
+        st.session_state.user_role = None
+        st.session_state.username = None
+        st.rerun()
+        
+    # ADMIN PANEL
+    if st.session_state.user_role == "admin":
+        st.title("👩‍🏫 Admin Control Panel (Secure Mode)")
+        
+        tab1, tab2 = st.tabs(["📝 View Results Logs", "➕ Add Secure Questions"])
+        
+        with tab1:
+            st.subheader("🔒 Tamper-Proof Student Results")
+            db_data = get_results()
+            if db_data:
+                # ဇယားကွက်ဖြင့် သေသပ်စွာပြသခြင်း
+                st.table([{"Timestamp": r[0], "Student Username": r[1], "Score Obtained": f"{r[2]} Points"} for r in db_data])
             else:
-                st.error("စကားဝှက် မှားယွင်းနေပါသည်။")
-        else:
-            st.error("အသုံးပြုသူအမည် မှားယွင်းနေပါသည်။")
-
-elif st.session_state.role == "admin":
-    st.title("👨‍🏫 Admin Control Panel (Secure Mode)")
-    st.sidebar.write(f"Current User: **{st.session_state.username}**")
-    if st.sidebar.button("Log Out"): logout()
-    
-    tab1, tab2 = st.tabs(["📋 View Results Logs", "➕ Add Secure Questions"])
-    
-    with tab1:
-        st.subheader("🔒 Tamper-Proof Student Results")
-        if st.session_state.submitted_students:
-            for student, res in st.session_state.submitted_students.items():
-                st.info(f"Student: **{student}** | Score: **{res['score']}** | Status: `SUBMITTED_AND_LOCKED` (Date: {res['date']})")
-        else:
-            st.info("ဖြေဆိုထားသော ကျောင်းသား မှတ်တမ်း မရှိသေးပါ။")
+                st.info("ဖြေဆိုထားသော ကျောင်းသား မှတ်တမ်း မရှိသေးပါ။")
+                
+        with tab2:
+            st.subheader("Inject New Question to Pool")
+            new_q = st.text_input("Question Text")
+            opt1 = st.text_input("Option 1")
+            opt2 = st.text_input("Option 2")
+            opt3 = st.text_input("Option 3")
+            opt4 = st.text_input("Option 4")
+            correct_opt = st.selectbox("Correct Option", [opt1, opt2, opt3, opt4])
             
-    with tab2:
-        st.subheader("Create a New Question")
-        new_q = st.text_area("Question Text")
-        opt_A = st.text_input("Option A")
-        opt_B = st.text_input("Option B")
-        opt_C = st.text_input("Option C")
-        opt_D = st.text_input("Option D")
-        correct_ans = st.selectbox("Select Correct Answer", [opt_A, opt_B, opt_C, opt_D])
+            if st.button("Inject into Question Pool"):
+                if new_q and opt1 and opt2:
+                    st.session_state.questions.append({"q": new_q, "options": [opt1, opt2, opt3, opt4], "correct": correct_opt})
+                    st.success("Question injected successfully!")
+                    
+    # STUDENT PANEL
+    elif st.session_state.user_role == "student":
+        st.title("✍️ Student Examination Terminal")
+        st.write(f"Active Session User: **{st.session_state.username}**")
+        st.warning("⚠️ Do not refresh this page. Refreshing will automatically lock your exam token.")
         
-        if st.button("Inject into Question Pool"):
-            if new_q and opt_A and opt_B:
-                st.session_state.questions.append({
-                    "question": new_q,
-                    "options": [opt_A, opt_B, opt_C, opt_D],
-                    "answer": correct_ans
-                })
-                st.success("မေးခွန်းကို Pool ထဲသို့ စနစ်တကျ ထည့်သွင်းပြီးပါပြီ။")
-            else:
-                st.error("ကျောင်းသား ဒေတာ အစုံအလင် ထည့်ပါ။")
-
-elif st.session_state.role == "student":
-    st.title("✍️ Secure Examination Terminal")
-    st.sidebar.write(f"Student ID: **{st.session_state.username}**")
-    if st.sidebar.button("Log Out"): logout()
-    
-    current_student = st.session_state.username
-    
-    if current_student in st.session_state.submitted_students:
-        st.warning("⚠️ Access Denied: You have already submitted this exam.")
-        saved_res = st.session_state.submitted_students[current_student]
-        st.success(f"သင်၏ ရမှတ်မှာ {saved_res['score']} ဖြစ်ပြီး စနစ်မှ သိမ်းဆည်းကာ Lock ချထားပြီး ဖြစ်ပါသည်။")
-    
-    else:
-        st.write("မေးခွန်းများကို သေချာဖတ်ပြီး ဖြေဆိုပါ။ Submit နှိပ်ပြီးပါက ပြန်ပြင်ခွင့် ရှိမည်မဟုတ်ပါ။")
-        st.markdown("---")
-        
+        score = 0
         user_answers = {}
+        
         for i, q in enumerate(st.session_state.questions):
-            st.write(f"**Question {i+1}: {q['question']}**")
-            user_answers[i] = st.radio(f"Select your answer:", q['options'], key=f"sec_q_{i}", index=None)
-            st.write("")
+            st.markdown(f"**Q{i+1}: {q['q']}**")
+            user_answers[i] = st.radio(f"Select answer for Q{i+1}:", q['options'], key=f"q_{i}")
+            st.write("---")
             
         if st.button("Final Submit & Lock Account", type="primary"):
-            unanswered = [i for i in user_answers if user_answers[i] is None]
-            if unanswered:
-                st.error("⚠️ မေးခွန်းအားလုံးကို ဖြေဆိုရန် လိုအပ်ပါသည်။")
-            else:
-                score = 0
-                total = len(st.session_state.questions)
-                for i, q in enumerate(st.session_state.questions):
-                    if user_answers[i] == q['answer']:
-                        score += 1
-                
-                st.session_state.submitted_students[current_student] = {
-                    "score": f"{score} / {total}",
-                    "date": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                }
-                st.success("စာမေးပွဲ အောင်မြင်စွာ ဖြေဆိုပြီးပါပြီ။ ရလဒ်ကို စနစ်သို့ ပေးပို့ပြီးပါပြီ။")
-                st.balloons()
-                st.rerun()
+            for i, q in enumerate(st.session_state.questions):
+                if user_answers[i] == q['correct']:
+                    score += 1
+            
+            # Database ထဲသို့ အပြီးအပိုင် လှမ်းသိမ်းခြင်း
+            save_result(st.session_state.username, score)
+            st.success(f"🎉 Exam submitted successfully! Score: {score}/{len(st.session_state.questions)}")
+            st.balloons()
+            
+            # Session ရှင်းလင်းပြီး ထွက်ခြင်း
+            st.session_state.logged_in = False
+            st.session_state.user_role = None
+            st.session_state.username = None
+            st.info("Your account is now locked. Redirecting...")
