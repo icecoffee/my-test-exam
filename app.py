@@ -4,10 +4,12 @@ from datetime import datetime
 
 # --- GOOGLE SHEET DATABASE CONNECTIVITY ---
 SHEET_ID = "1ytBPXMKDwY2CY1hkEBxL6bCVwgr-GkmhzDFpvSVTIkA"
-# Sheet1 (Results) အတွက် လင့်ခ်
+# Sheet1 (Results) GID = 0
 CSV_RESULTS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid=0"
-# Sheet2 (Questions) အတွက် ဆရာ့ Sheet2 ရဲ့ သီးသန့် GID: 2071758052 ကို တိုက်ရိုက်ချိတ်ဆက်ခြင်း
+# Sheet2 (Questions) GID = 2071758052
 CSV_QUESTIONS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid=2071758052"
+# Sheet3 (Student Users) ကို Dynamic လှမ်းဖတ်ရန် ချိတ်ဆက်ခြင်း
+CSV_USERS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&sheet=Sheet3"
 
 def get_results_from_sheet():
     try:
@@ -17,7 +19,6 @@ def get_results_from_sheet():
         return []
 
 def get_questions_from_sheet():
-    # အရန်စနစ် (Fallback Base Pool) - Sheet ထဲက ဖတ်မရပါက ဤမေးခွန်းများ ပြပေးမည်
     default_questions = [
         {"q": "Nuclear shielding matching: Which material is most effective for neutron attenuation?", "options": ["Lead (Pb)", "Water / Paraffin", "Aluminum (Al)", "Copper (Cu)"], "correct": "Water / Paraffin"},
         {"q": "The 555 Timer IC operating in Astable mode produces which type of output waveform?", "options": ["Sine Wave", "Square Wave", "Triangular Wave", "Sawtooth Wave"], "correct": "Square Wave"}
@@ -38,6 +39,19 @@ def get_questions_from_sheet():
         return default_questions
     except:
         return default_questions
+
+def get_student_users_from_sheet():
+    try:
+        df = pd.read_csv(CSV_USERS_URL)
+        users_dict = {}
+        if not df.empty:
+            for row in df.values.tolist():
+                if len(row) >= 2 and pd.notna(row[0]) and pd.notna(row[1]):
+                    users_dict[str(row[0]).strip()] = str(row[1]).strip()
+        return users_dict
+    except:
+        # Sheet3 မဆောက်ရသေးပါက သုံးရန် Default အကောင့်
+        return {"student": "student123"}
 
 def save_result_to_sheet(username, score):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -60,17 +74,19 @@ if "user_role" not in st.session_state:
 if "username" not in st.session_state:
     st.session_state.username = None
 
-# Load Dynamic Questions
+# Load Dynamic Data
 all_questions = get_questions_from_sheet()
 if "local_questions" in st.session_state:
     for lq in st.session_state.local_questions:
         if lq not in all_questions:
             all_questions.append(lq)
 
+valid_students = get_student_users_from_sheet()
+
 # --- UI LOGIC ---
 if not st.session_state.logged_in:
     st.title("🔐 Secure Online Examination System")
-    st.subheader("DCS Prototype Version (Permanent Question Pool)")
+    st.subheader("DCS Production Prototype (Dynamic Authentication Mode)")
     
     username = st.text_input("Username (Case-sensitive)")
     password = st.text_input("Password", type="password")
@@ -81,7 +97,8 @@ if not st.session_state.logged_in:
             st.session_state.user_role = "admin"
             st.session_state.username = "admin"
             st.rerun()
-        elif username == "student" and password == "student123":
+        elif username in valid_students and password == valid_students[username]:
+            # စစ်ဆေးမှု: ၎င်းကျောင်းသား အရင်ဖြေပြီးသား ဟုတ်မဟုတ်စစ်ခြင်း
             sheet_data = get_results_from_sheet()
             already_submitted = False
             for row in sheet_data:
@@ -90,14 +107,14 @@ if not st.session_state.logged_in:
                     break
                     
             if already_submitted:
-                st.error("❌ Access Denied: You have already submitted your exam. Account is locked.")
+                st.error(f"❌ Access Denied: User '{username}' has already submitted the exam. Account Locked.")
             else:
                 st.session_state.logged_in = True
                 st.session_state.user_role = "student"
                 st.session_state.username = username
                 st.rerun()
         else:
-            st.error("Invalid credentials.")
+            st.error("Invalid credentials. Please try again.")
 else:
     if st.sidebar.button("Log Out"):
         st.session_state.logged_in = False
