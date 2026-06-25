@@ -8,8 +8,8 @@ SHEET_ID = "1ytBPXMKDwY2CY1hkEBxL6bCVwgr-GkmhzDFpvSVTIkA"
 CSV_RESULTS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid=0"
 # Sheet2 (Questions) GID = 2071758052
 CSV_QUESTIONS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid=2071758052"
-# Sheet3 (Student Users) ကို Dynamic လှမ်းဖတ်ရန် ချိတ်ဆက်ခြင်း
-CSV_USERS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&sheet=Sheet3"
+# ⚠️ အရေးကြီး - ဆရာ့ Sheet3 ရဲ့ GID နံပါတ်ကို အောက်ပါနေရာတွင် အစားထိုးထည့်သွင်းပေးပါ ဆရာ
+CSV_USERS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid=ဆရာ့_Sheet3_GID_ဂဏန်းများ"
 
 def get_results_from_sheet():
     try:
@@ -50,7 +50,6 @@ def get_student_users_from_sheet():
                     users_dict[str(row[0]).strip()] = str(row[1]).strip()
         return users_dict
     except:
-        # Sheet3 မဆောက်ရသေးပါက သုံးရန် Default အကောင့်
         return {"student": "student123"}
 
 def save_result_to_sheet(username, score):
@@ -74,7 +73,6 @@ if "user_role" not in st.session_state:
 if "username" not in st.session_state:
     st.session_state.username = None
 
-# Load Dynamic Data
 all_questions = get_questions_from_sheet()
 if "local_questions" in st.session_state:
     for lq in st.session_state.local_questions:
@@ -98,7 +96,6 @@ if not st.session_state.logged_in:
             st.session_state.username = "admin"
             st.rerun()
         elif username in valid_students and password == valid_students[username]:
-            # စစ်ဆေးမှု: ၎င်းကျောင်းသား အရင်ဖြေပြီးသား ဟုတ်မဟုတ်စစ်ခြင်း
             sheet_data = get_results_from_sheet()
             already_submitted = False
             for row in sheet_data:
