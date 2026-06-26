@@ -496,17 +496,27 @@ else:
             disp_score = st.session_state.final_score if 'final_score' in st.session_state else 0
             st.success(f"🎉 သင်၏ ရမှတ်မှာ {disp_score}/{len(all_questions)} ဖြစ်ပြီး စနစ်မှ သိမ်းဆည်းကာ Lock ချထားပြီး ဖြစ်ပါသည်။")
             st.balloons()
-# --- ADMIN PANEL ---
-    if st.session_state.user_role == "admin":
-        st.title("👩‍🏫 Admin Control Panel (Secure Mode)")
-        
-        # Sidebar တွင် System Control ခလုတ်တစ်ခုတည်းကိုသာ ထားရှိခြင်း
-        st.sidebar.subheader("⚙️ System Control")
-        if st.sidebar.button("♻️ FULL SYSTEM RESET", type="primary"):
-            st.session_state.global_results_pool = []
-            if "submitted" in st.session_state: st.session_state.submitted = False
-            st.sidebar.success("Memory Pool & Lock System Cleared!")
+# --- UI LOGIC ---
+    if not st.session_state.logged_in:
+        # Login စာမျက်နှာ (မူလအတိုင်း)
+        # ...
+    else:
+        # Sidebar Log Out ခလုတ်ကို နေရာတစ်ခုတည်းတွင်သာ ထားပါ
+        if st.sidebar.button("Log Out"):
+            st.session_state.logged_in = False
+            st.session_state.user_role = None
             st.rerun()
+            
+        # --- ADMIN PANEL ---
+        if st.session_state.user_role == "admin":
+            st.title("👩‍🏫 Admin Control Panel (Secure Mode)")
+            
+            st.sidebar.subheader("⚙️ System Control")
+            # ခလုတ်တစ်ခုတည်းသာ သုံးပါ
+            if st.sidebar.button("♻️ FULL SYSTEM RESET", type="primary"):
+                st.session_state.global_results_pool = []
+                if "submitted" in st.session_state: st.session_state.submitted = False
+                st.rerun()
         
         # Tab အပိုင်း
         tab1, tab2 = st.tabs(["📝 View Results Logs", "➕ Add Secure Questions"])
