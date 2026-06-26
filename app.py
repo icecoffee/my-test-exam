@@ -61,17 +61,14 @@ else:
         st.title(f"✍️ Welcome, {st.session_state.username}")
         if st.button("Log out"): st.session_state.logged_in = False; st.rerun()
         
+        # ဒေတာကို ဖတ်ပါ
         questions = load_data(URL_QUESTIONS)
         
+        # Debugging: ဒေတာဘာတွေပါလဲ စစ်ဆေးခြင်း
+        st.write("Debug: Loaded Questions Data:")
+        st.write(questions) # ဒီနေရာမှာ မေးခွန်းတွေ ပေါ်မလာရင် URL မှာ ပြဿနာရှိနေတာပါ
+        
         if not questions.empty:
-            # အကယ်၍ 'Correct' column ရှိမှသာ drop လုပ်ပါ၊ မရှိရင် မလုပ်ပါနဲ့ (အမှားမတက်အောင်)
-            if 'Correct' in questions.columns:
-                student_view = questions.drop(columns=['Correct'])
-            else:
-                student_view = questions
-            
-            st.table(student_view)
-            st.write("---")
-            st.info("အဖြေကို Submit လုပ်ရန် အောက်ပါ အဖြေရွေးချယ်မှုများကို သုံးပါ")
+            st.table(questions)
         else:
-            st.warning("မေးခွန်းများ တင်ဆောင်ရန် စောင့်ဆိုင်းနေပါသည်...")
+            st.warning("မေးခွန်းများ မတွေ့ရှိပါ။ Google Sheet link သို့မဟုတ် Sheet2 ကို ပြန်စစ်ပါ။")
