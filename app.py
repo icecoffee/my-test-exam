@@ -13,7 +13,7 @@ CSV_QUESTIONS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?
 CSV_USERS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Sheet3"
 
 # ဆရာ့ရဲ့ Apps Script Web App URL အစစ်
-WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxE_2WOfBxJcQgsWrvSLCgGWO2B95sKldceQE3VgyQ25zPEI9D2fNwsXng523Pakt9Q1w/exec"
+WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzIGCo5gvafmu4M2B9FEwEOichPdCDOLFmtmcsz9YaM0GzrG-DDe2u4HYVt3D66xeE9fg/exec"
 
 # စာမေးပွဲဖြေဆိုချိန် မိနစ် ကန့်သတ်ချက် (မိနစ် ၂၀)
 EXAM_DURATION_MINUTES = 20
@@ -149,7 +149,6 @@ else:
     if st.session_state.user_role == "admin":
         st.title("👩‍🏫 Admin Control Panel (Secure Mode)")
         
-        # 💡 [ADMIN REBOOT SWITCH] - ဆရာ့အတွက် စနစ်ကို Reboot ချပေးမည့် ခလုတ်အသစ်
         st.sidebar.subheader("⚙️ System Control")
         if st.sidebar.button("♻️ Force Reboot System", type="secondary"):
             st.session_state.global_results_pool = []
@@ -205,7 +204,7 @@ else:
                         radio_key = f"q_{i}"
                         if radio_key in st.session_state and st.session_state[radio_key] == q['correct']:
                             auto_score += 1
-                    save_result_to_sheet(st.session_state.username, auto_score)
+                    save_result_to_sheet(st.session_state.username, f"{auto_score}/{len(all_questions)}")
                     st.session_state.submitted = True
                     st.session_state.final_score = auto_score
                     st.rerun()
@@ -227,7 +226,8 @@ else:
                 
                 for i, q in enumerate(all_questions):
                     st.markdown(f"##### Q{i+1}: {q['q']}")
-                    user_answers[i] = st.radio(f"Select answer for Q{i+1}:", q['options'], key=f"q_{i}")
+                    # 💡 [FIX] index=None ထည့်သွင်းခြင်းဖြင့် မူလအစက်ချထားမှုကို ဖျက်ပစ်ပြီး ကျောင်းသားကိုယ်တိုင် နှိပ်ရမည့်ပုံစံသို့ ပြောင်းလဲခြင်း
+                    user_answers[i] = st.radio(f"Select answer for Q{i+1}:", q['options'], index=None, key=f"q_{i}")
                     st.write("---")
                     
                 if st.button("Final Submit & Lock Account", type="primary"):
@@ -235,7 +235,9 @@ else:
                         if user_answers[i] == q['correct']:
                             score += 1
                     
-                    save_result_to_sheet(st.session_state.username, score)
+                    # Google Sheet ထဲကို "ရမှတ်/စုစုပေါင်းမေးခွန်း" (ဥပမာ - 3/3) ပုံစံဖြင့် တိုက်ရိုက်သိမ်းဆည်းရန် ပြင်ဆင်ခြင်း
+                    formatted_score = f"{score}/{len(all_questions)}"
+                    save_result_to_sheet(st.session_state.username, formatted_score)
                     st.session_state.submitted = True
                     st.session_state.final_score = score
                     st.rerun()
