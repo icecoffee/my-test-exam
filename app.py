@@ -214,6 +214,10 @@ else:
                 mins, secs = divmod(seconds_left, 60)
                 timer_text = f"⏳ ကျန်ရှိချိန် - {mins:02d}:{secs:02d}"
                 
+                # Timer ဂဏန်း ရွေ့သွားစေရန် 
+                time.sleep(1)
+                st.rerun()
+                
                 if seconds_left < 60:
                     st.sidebar.error(timer_text)
                 else:
