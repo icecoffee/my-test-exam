@@ -13,7 +13,7 @@ CSV_QUESTIONS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?
 CSV_USERS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Sheet3"
 
 # ဆရာ့ရဲ့ Apps Script Web App URL အစစ်
-WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzIGCo5gvafmu4M2B9FEwEOichPdCDOLFmtmcsz9YaM0GzrG-DDe2u4HYVt3D66xeE9fg/exec"
+WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxE_2WOfBxJcQgsWrvSLCgGWO2B95sKldceQE3VgyQ25zPEI9D2fNwsXng523Pakt9Q1w/exec"
 
 # စာမေးပွဲဖြေဆိုချိန် မိနစ် ကန့်သတ်ချက် (မိနစ် ၂၀)
 EXAM_DURATION_MINUTES = 20
