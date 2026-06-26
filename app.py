@@ -183,17 +183,17 @@ else:
             st.subheader("Inject New Question to Pool Permanently")
             st.info("💡 ဤနေရာတွင် မေးခွန်းအသစ်များကို Google Sheet (Sheet2) ထဲသို့ တိုက်ရိုက်သွားရောက်တိုးပေးရပါမည်။")
                     
- # --- STUDENT PANEL ---
+# --- STUDENT PANEL ---
     elif st.session_state.user_role == "student":
         st.title("✍️ Student Examination Terminal")
         st.write(f"Active Session User: **{st.session_state.username}**")
         
-       # Timer လေးကို ဒီအတိုင်းလေး ပြင်လိုက်ပါ
+        # Timer Logic (UTC ကိုပဲ အသုံးပြုခြင်း)
         @st.fragment(run_every=1.0)
         def show_timer():
             if "start_time" in st.session_state:
-                # 390min ပြဿနာဖြေရှင်းရန် datetime.now() ကိုပဲ တိုက်ရိုက်သုံးပါ
-                elapsed = (datetime.now() - st.session_state.start_time).total_seconds()
+                # အရေးကြီး: datetime.utcnow() ကိုပဲ သုံးပါ
+                elapsed = (datetime.utcnow() - st.session_state.start_time).total_seconds()
                 remaining = (EXAM_DURATION_MINUTES * 60) - elapsed 
                 
                 timer_ph = st.empty()
@@ -212,22 +212,20 @@ else:
                 user_answers = {}
                 for i, q in enumerate(all_questions):
                     st.markdown(f"##### Q{i+1}: {q['q']}")
-                    user_answers[i] = st.radio(f"Select answer for Q{i+1}:", q['options'], index=None, key=f"q_{i}")
+                    user_answers[i] = st.radio(f"Select:", q['options'], index=None, key=f"q_{i}")
                     st.write("---")
                     
-                if st.button("Final Submit & Lock Account", type="primary"):
+                if st.button("Final Submit", type="primary"):
                     score = 0
                     for i, q in enumerate(all_questions):
-                        if i in user_answers and user_answers[i] is not None:
-                            if str(user_answers[i]) == str(q['correct']):
-                                score += 1
+                        if i in user_answers and str(user_answers[i]) == str(q['correct']):
+                            score += 1
+                    
                     save_result_to_sheet(st.session_state.username, score)
                     st.session_state.submitted = True
                     st.session_state.final_score = score
                     st.rerun()
             else:
-                st.warning("⚠️ မေးခွန်းများ ဆွဲယူနေဆဲ ဖြစ်ပါသည်။")
+                st.warning("⚠️ Loading questions...")
         else:
-            disp_score = st.session_state.final_score if 'final_score' in st.session_state else 0
-            st.success(f"🎉 သင်၏ ရမှတ်မှာ {disp_score}/{len(all_questions)} ဖြစ်ပြီး စနစ်မှ သိမ်းဆည်းကာ Lock ချထားပြီး ဖြစ်ပါသည်။")
-            st.balloons()
+            st.success(f"🎉 ဖြေဆိုပြီးပါပြီ။ ရမှတ်: {st.session_state.get('final_score', 0)}")
