@@ -214,16 +214,35 @@ else:
                 mins, secs = divmod(seconds_left, 60)
                 timer_text = f"⏳ ကျန်ရှိချိန် - {mins:02d}:{secs:02d}"
                 
-                # Timer ဂဏန်း ရွေ့သွားစေရန် 
-                time.sleep(1)
-                st.rerun()
+             
                 
                 if seconds_left < 60:
                     st.sidebar.error(timer_text)
                 else:
                     st.sidebar.warning(timer_text)
                     
-                st.fragment(run_every=1.0)(lambda: None)()
+               # --- ၁။ ဒီ Function ကို File ရဲ့ အပေါ်ပိုင်း (သို့) ကိုယ့်နေရာမှာ ထည့်ပါ ---
+@st.fragment(run_every=1.0)
+def show_timer():
+    if "start_time" in st.session_state:
+        # လက်ရှိအချိန်နဲ့ စတဲ့အချိန် နှိုင်းယှဉ်ခြင်း
+        elapsed = (datetime.now() - st.session_state.start_time).total_seconds()
+        remaining = (EXAM_DURATION_MINUTES * 3) - elapsed 
+        
+        if remaining > 0:
+            mins, secs = divmod(int(remaining), 60)
+            timer_text = f"⏳ ကျန်ရှိချိန်: {mins:02d}:{secs:02d}"
+            
+            if remaining < 60:
+                st.sidebar.error(timer_text)
+            else:
+                st.sidebar.warning(timer_text)
+        else:
+            st.sidebar.error("⏰ အချိန်ကုန်သွားပါပြီ!")
+            # အချိန်ကုန်ရင် အလိုအလျောက် Submit ဖြစ်အောင် ဒီမှာ ခေါ်သုံးနိုင်ပါတယ်
+            
+if st.session_state.user:
+    show_timer()
             
             # --- QUESTIONS UI ---
             if all_questions:
