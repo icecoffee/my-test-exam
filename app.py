@@ -7,220 +7,96 @@ import time
 
 # --- GOOGLE SHEET DATABASE CONNECTIVITY ---
 SHEET_ID = "1ytBPXMKDwY2CY1hkEBxL6bCVwgr-GkmhzDFpvSVTIkA"
-
 CSV_RESULTS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Sheet1"
 CSV_QUESTIONS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Sheet2"
 CSV_USERS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Sheet3"
-
-# admin ရဲ့ Apps Script Web App URL
 WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwyFMXmqgLQyIx-kUN54Q5oVV4q8T1WJEvoksyo_EugBLAYeZ9SUQt35BpQF8pWMOmbcQ/exec"
 
-# စာမေးပွဲဖြေဆိုချိန် မိနစ် ကန့်သတ်ချက် (မိနစ် 5)
 EXAM_DURATION_MINUTES = 5
 
-# --- GLOBAL LIVE MEMORY POOL FOR ADMIN VIEW ---
 if "global_results_pool" not in st.session_state:
     st.session_state.global_results_pool = []
 
 def get_results_from_sheet():
-    try:
-        df = pd.read_csv(CSV_RESULTS_URL)
-        return df.values.tolist()
-    except:
-        return []
+    try: return pd.read_csv(CSV_RESULTS_URL).values.tolist()
+    except: return []
 
 def get_questions_from_sheet():
     try:
         df = pd.read_csv(CSV_QUESTIONS_URL)
-        if df is not None and not df.empty:
-            sheet_questions = []
-            for row in df.values.tolist():
-                if len(row) >= 6 and pd.notna(row[0]):
-                    sheet_questions.append({
-                        "q": str(row[0]),
-                        "options": [str(row[1]), str(row[2]), str(row[3]), str(row[4])],
-                        "correct": str(row[5])
-                    })
-            if sheet_questions:
-                return sheet_questions
-    except:
-        pass
-        
-    return [
-        {"q": "Nuclear shielding matching: Which material is most effective for neutron attenuation?", "options": ["Lead (Pb)", "Water / Paraffin", "Aluminum (Al)", "Copper (Cu)"], "correct": "Water / Paraffin"},
-        {"q": "The 555 Timer IC operating in Astable mode produces which type of output waveform?", "options": ["Sine Wave", "Square Wave", "Triangular Wave", "Sawtooth Wave"], "correct": "Square Wave"}
-    ]
+        sheet_questions = []
+        for row in df.values.tolist():
+            if len(row) >= 6 and pd.notna(row[0]):
+                sheet_questions.append({"q": str(row[0]), "options": [str(row[1]), str(row[2]), str(row[3]), str(row[4])], "correct": str(row[5])})
+        return sheet_questions if sheet_questions else []
+    except: return []
 
 def get_student_users_from_sheet():
-    base_users = {
-        "student": "student123",
-        "Roll1": "12345",
-        "Roll2": "12345"
-    }
+    base_users = {"student": "student123", "Roll1": "12345", "Roll2": "12345"}
     try:
         df = pd.read_csv(CSV_USERS_URL)
-        if df is not None and not df.empty:
-            df.columns = df.columns.str.strip()
-            user_col = [c for c in df.columns if 'user' in c.lower()][0]
-            pwd_col = [c for c in df.columns if 'pass' in c.lower()][0]
-            
-            for _, row in df.iterrows():
-                if pd.notna(row[user_col]) and pd.notna(row[pwd_col]):
-                    base_users[str(row[user_col]).strip()] = str(row[pwd_col]).strip()
-    except:
-        pass
+        df.columns = df.columns.str.strip()
+        user_col, pwd_col = [c for c in df.columns if 'user' in c.lower()][0], [c for c in df.columns if 'pass' in c.lower()][0]
+        for _, row in df.iterrows():
+            if pd.notna(row[user_col]): base_users[str(row[user_col]).strip()] = str(row[pwd_col]).strip()
+    except: pass
     return base_users
 
 def save_result_to_sheet(username, score):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    new_record = [timestamp, username, score]
-    if new_record not in st.session_state.global_results_pool:
-        st.session_state.global_results_pool.append(new_record)
-        
+    st.session_state.global_results_pool.append([timestamp, username, score])
     try:
         payload = json.dumps({"timestamp": timestamp, "username": username, "score": int(score)}).encode('utf-8')
         req = urllib.request.Request(WEB_APP_URL, data=payload, headers={'Content-Type': 'application/json'}, method='POST')
         urllib.request.urlopen(req, timeout=3)
-    except:
-        pass
+    except: pass
 
-# --- APP CONFIGURATION ---
 st.set_page_config(page_title="Secure Exam Terminal", page_icon="🔐", layout="centered")
 
 if "logged_in" not in st.session_state: st.session_state.logged_in = False
-if "user_role" not in st.session_state: st.session_state.user_role = None
-if "username" not in st.session_state: st.session_state.username = None
-if "submitted" not in st.session_state: st.session_state.submitted = False
 
-# --- UI LOGIC ---
 if not st.session_state.logged_in:
     st.title("🔐 Secure Online Examination System")
-    st.subheader("DCS Production Prototype (Dynamic Authentication Mode)")
-    
-    username = st.text_input("Username (Case-sensitive)")
+    username = st.text_input("Username")
     password = st.text_input("Password", type="password")
-    
-    if st.button("Secure Login", type="primary"):
+    if st.button("Secure Login"):
+        users = get_student_users_from_sheet()
         if username == "admin" and password == "admin123":
-            st.session_state.logged_in = True
-            st.session_state.user_role = "admin"
-            st.session_state.username = "admin"
+            st.session_state.update(logged_in=True, user_role="admin", username="admin")
             st.rerun()
-        else:
-            valid_students = get_student_users_from_sheet()
-            if username in valid_students and str(password).strip() == str(valid_students[username]).strip():
-                sheet_data = get_results_from_sheet()
-                already_submitted = False
-                
-                for row in sheet_data:
-                    if len(row) > 1 and str(row[1]) == username:
-                        already_submitted = True
-                        break
-                for r in st.session_state.global_results_pool:
-                    if r[1] == username:
-                        already_submitted = True
-                        break
-                
-                if already_submitted:
-                    st.error(f"❌ Access Denied: User '{username}' has already submitted the exam. Account Locked.")
-                else:
-                    st.session_state.logged_in = True
-                    st.session_state.user_role = "student"
-                    st.session_state.username = username
-                    st.session_state.submitted = False
-                    st.session_state.start_time = datetime.now() # အချိန်အမှားကင်းစေရန် ပြောင်းထားသည်
-                    st.rerun()
-            else:
-                st.error("Invalid credentials. Please try again.")
+        elif username in users and str(password).strip() == users[username]:
+            st.session_state.update(logged_in=True, user_role="student", username=username, submitted=False, start_time=datetime.now())
+            st.rerun()
 else:
-    if st.sidebar.button("Log Out"):
-        st.session_state.logged_in = False
-        st.session_state.user_role = None
-        st.session_state.username = None
-        st.session_state.submitted = False
-        if "start_time" in st.session_state: del st.session_state.start_time
-        st.rerun()
-        
+    if st.sidebar.button("Log Out"): st.session_state.clear(); st.rerun()
+    
     if st.session_state.user_role == "admin":
-        st.title("👩‍🏫 Admin Control Panel (Secure Mode)")
-        
-        st.sidebar.subheader("⚙️ System Control")
-        if st.sidebar.button("♻️ Force Reboot System", type="secondary"):
-            st.session_state.global_results_pool = []
-            st.sidebar.success("Memory Pool Cleared Successfully!")
-            time.sleep(0.5)
-            st.rerun()
-        
-        tab1, tab2 = st.tabs(["📝 View Results Logs", "➕ Add Secure Questions"])
-        
-        with tab1:
-            st.subheader("🔒 Terminal Live Records")
-            db_data = get_results_from_sheet()
-            display_data = []
+        st.title("👩‍🏫 Admin Panel")
+        db_data = get_results_from_sheet()
+        display_data = [{"Timestamp": r[0], "User": r[1], "Score": r[2]} for r in db_data if len(r) >= 3 and str(r[0]) != "timestamp"]
+        if display_data: st.table(display_data)
+        else: st.info("မှတ်တမ်းမရှိသေးပါ။")
             
-            for r in db_data:
-                if len(r) >= 3 and str(r[0]).lower() != "timestamp":
-                    display_data.append({"Timestamp": r[0], "Student Username": r[1], "Score Obtained": f"{r[2]} Points"})
-            
-            for r in st.session_state.global_results_pool:
-                row_dict = {"Timestamp": r[0], "Student Username": r[1], "Score Obtained": f"{r[2]} Points"}
-                if row_dict not in display_data:
-                    display_data.append(row_dict)
-            
-            if display_data:
-                st.table(display_data)
-            else:
-                st.info("💡 ဖြေဆိုထားသော ကျောင်းသား မှတ်တမ်း မရှိသေးပါ။")
-                
-        with tab2:
-            st.subheader("Inject New Question to Pool Permanently")
-            st.info("💡 ဤနေရာတွင် မေးခွန်းအသစ်များကို Google Sheet (Sheet2) ထဲသို့ တိုက်ရိုက်သွားရောက်တိုးပေးရပါမည်။")
-                    
     elif st.session_state.user_role == "student":
         st.title("✍️ Student Examination Terminal")
-        st.write(f"Active Session User: **{st.session_state.username}**")
         
-        all_questions = get_questions_from_sheet()
-        
+        # --- FIXED TIMER LOGIC ---
         if not st.session_state.submitted:
-            if "start_time" in st.session_state:
-                # Timer ကို datetime.now() ဖြင့်သာ တွက်ချက်ထားသည်
-                end_time = st.session_state.start_time + timedelta(minutes=EXAM_DURATION_MINUTES)
-                now = datetime.now()
-                remaining = end_time - now
-                seconds_left = int(remaining.total_seconds())
-                
-                if seconds_left <= 0:
-                    st.error("⏳ အချိန်ပြည့်သွားပါပြီ။")
-                    time.sleep(1)
-                    auto_score = 0
-                    for i, q in enumerate(all_questions):
-                        radio_key = f"q_{i}"
-                        if radio_key in st.session_state and st.session_state[radio_key] == q['correct']:
-                            auto_score += 1
-                    save_result_to_sheet(st.session_state.username, auto_score)
-                    st.session_state.submitted = True
-                    st.session_state.final_score = auto_score
-                    st.rerun()
-                
-                mins, secs = divmod(seconds_left, 60)
-                st.sidebar.warning(f"⏳ ကျန်ရှိချိန် - {mins:02d}:{secs:02d}")
-                st.fragment(run_every=1.0)(lambda: None)()
+            elapsed = (datetime.now() - st.session_state.start_time).total_seconds()
+            remaining = (EXAM_DURATION_MINUTES * 60) - elapsed
             
-            if all_questions:
-                user_answers = {}
-                for i, q in enumerate(all_questions):
-                    st.markdown(f"##### Q{i+1}: {q['q']}")
-                    user_answers[i] = st.radio(f"Select answer for Q{i+1}:", q['options'], index=None, key=f"q_{i}")
-                    st.write("---")
-                    
-                if st.button("Final Submit & Lock Account", type="primary"):
-                    score = sum(1 for i, q in enumerate(all_questions) if str(user_answers.get(i)) == str(q['correct']))
-                    save_result_to_sheet(st.session_state.username, score)
-                    st.session_state.submitted = True
-                    st.session_state.final_score = score
-                    st.rerun()
-            else:
-                st.warning("⚠️ မေးခွန်းများ ဆွဲယူနေဆဲ ဖြစ်ပါသည်။")
+            if remaining > 0:
+                mins, secs = divmod(int(remaining), 60)
+                st.sidebar.warning(f"⏳ ကျန်ရှိချိန်: {mins:02d}:{secs:02d}")
+            else: st.error("⏰ အချိန်ကုန်သွားပါပြီ!")
+            
+            all_q = get_questions_from_sheet()
+            user_ans = {i: st.radio(q['q'], q['options'], index=None, key=f"q{i}") for i, q in enumerate(all_q)}
+            
+            if st.button("Final Submit"):
+                score = sum(1 for i, q in enumerate(all_q) if str(user_ans[i]) == str(q['correct']))
+                save_result_to_sheet(st.session_state.username, score)
+                st.session_state.submitted = True
+                st.rerun()
         else:
-            st.success(f"🎉 သင်၏ ရမှတ်မှာ {st.session_state.get('final_score', 0)} ဖြစ်ပြီး စနစ်မှ သိမ်းဆည်းကာ Lock ချထားပြီး ဖြစ်ပါသည်။")
+            st.success("🎉 ဖြေဆိုပြီးပါပြီ။")
