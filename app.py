@@ -190,18 +190,22 @@ else:
         
         all_questions = get_questions_from_sheet()
         
-        # 1. Fragment ကို Function အနေနဲ့ အပေါ်မှာ သီးသန့် ရေးထားပါ (အောက်မှာ တစ်ခါတည်း သုံးပါ)
-        @st.fragment(run_every=1.0)
-        def show_timer():
-            if "start_time" in st.session_state:
-                elapsed = (datetime.now() - st.session_state.start_time).total_seconds()
-                remaining = (EXAM_DURATION_MINUTES * 60) - elapsed 
-                if remaining > 0:
-                    mins, secs = divmod(int(remaining), 60)
-                    st.sidebar.warning(f"⏳ ကျန်ရှိချိန်: {mins:02d}:{secs:02d}")
-                else:
-                    st.sidebar.error("⏰ အချိန်ကုန်သွားပါပြီ!")
-                    # အချိန်ကုန်ရင် အလိုအလျောက် Submit ဖြစ်မယ့် Logic ကို ဒီမှာ ထည့်လို့ရပါတယ်
+# --- Timer ကို Sidebar အစား စာမျက်နှာပေါ်တွင် ပြသရန် ---
+@st.fragment(run_every=1.0)
+def show_timer():
+    if "start_time" in st.session_state:
+        elapsed = (datetime.now() - st.session_state.start_time).total_seconds()
+        remaining = (EXAM_DURATION_MINUTES * 60) - elapsed 
+        
+        # st.sidebar အစား st.empty() ကို သုံး၍ စာမျက်နှာပေါ်တွင် ပြသပါ
+        timer_ph = st.empty() 
+        
+        if remaining > 0:
+            mins, secs = divmod(int(remaining), 60)
+            timer_ph.warning(f"⏳ ကျန်ရှိချိန်: {mins:02d}:{secs:02d}")
+        else:
+            timer_ph.error("⏰ အချိန်ကုန်သွားပါပြီ!")
+            # အချိန်ကုန်လျှင် အလိုအလျောက် Submit ဖြစ်စေရန် Logic ထည့်နိုင်ပါသည်
 
         # 2. Logic စတင်ခြင်း
         if not st.session_state.submitted:
