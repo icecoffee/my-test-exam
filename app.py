@@ -13,10 +13,10 @@ CSV_QUESTIONS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?
 CSV_USERS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Sheet3"
 
 # ဆရာ့ရဲ့ Apps Script Web App URL အစစ်
-WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzIGCo5gvafmu4M2B9FEwEOichPdCDOLFmtmcsz9YaM0GzrG-DDe2u4HYVt3D66xeE9fg/exec"
+WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxxQRSfji0_6BNZzokH5V2XKoL5rb7RgOYBAElIoEkMb9hmO6nFYgzhFvP6SSJhQAHt2g/exec"
 
 # စာမေးပွဲဖြေဆိုချိန် မိနစ် ကန့်သတ်ချက်
-EXAM_DURATION_MINUTES = 20
+EXAM_DURATION_MINUTES = 3
 
 # 💡 [CORE FIX] - Server အချိန်ကို မြန်မာစံတော်ချိန် (GMT +6:30) သို့ ပြောင်းလဲပေးသည့် လုပ်ဆောင်ချက်
 def get_mm_now():
