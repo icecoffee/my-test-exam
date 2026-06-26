@@ -82,7 +82,7 @@ def save_result_to_sheet(username, score):
         st.session_state.global_results_pool.append(new_record)
         
     try:
-        payload = json.dumps({"timestamp": timestamp, "username": username, "score": int(score)}).encode('utf-8')
+        payload = json.dumps({"timestamp": timestamp, "username": username, "score": str(score)}).encode('utf-8')
         req = urllib.request.Request(WEB_APP_URL, data=payload, headers={'Content-Type': 'application/json'}, method='POST')
         urllib.request.urlopen(req, timeout=3)
     except:
@@ -165,10 +165,10 @@ else:
             
             for r in db_data:
                 if len(r) >= 3 and str(r[0]).lower() != "timestamp":
-                    display_data.append({"Timestamp": r[0], "Student Username": r[1], "Score Obtained": f"{r[2]} Points"})
+                    display_data.append({"Timestamp": r[0], "Student Username": r[1], "Score Obtained": str(r[2])})
             
             for r in st.session_state.global_results_pool:
-                row_dict = {"Timestamp": r[0], "Student Username": r[1], "Score Obtained": f"{r[2]} Points"}
+                row_dict = {"Timestamp": r[0], "Student Username": r[1], "Score Obtained": str(r[2])}
                 if row_dict not in display_data:
                     display_data.append(row_dict)
             
@@ -226,16 +226,16 @@ else:
                 
                 for i, q in enumerate(all_questions):
                     st.markdown(f"##### Q{i+1}: {q['q']}")
-                    # 💡 [FIX] index=None ထည့်သွင်းခြင်းဖြင့် မူလအစက်ချထားမှုကို ဖျက်ပစ်ပြီး ကျောင်းသားကိုယ်တိုင် နှိပ်ရမည့်ပုံစံသို့ ပြောင်းလဲခြင်း
                     user_answers[i] = st.radio(f"Select answer for Q{i+1}:", q['options'], index=None, key=f"q_{i}")
                     st.write("---")
                     
                 if st.button("Final Submit & Lock Account", type="primary"):
                     for i, q in enumerate(all_questions):
-                        if user_answers[i] == q['correct']:
-                            score += 1
+                        # 💡 [STABLE FIX] - ကျောင်းသားက အဖြေမရွေးဘဲ (None ဖြစ်ပြီး) ချန်ထားခဲ့လျှင်လည်း အမှားကင်းစွာ ကျော်ဖြတ်နိုင်ရန် ပြင်ဆင်ခြင်း
+                        if i in user_answers and user_answers[i] is not None:
+                            if str(user_answers[i]) == str(q['correct']):
+                                score += 1
                     
-                    # Google Sheet ထဲကို "ရမှတ်/စုစုပေါင်းမေးခွန်း" (ဥပမာ - 3/3) ပုံစံဖြင့် တိုက်ရိုက်သိမ်းဆည်းရန် ပြင်ဆင်ခြင်း
                     formatted_score = f"{score}/{len(all_questions)}"
                     save_result_to_sheet(st.session_state.username, formatted_score)
                     st.session_state.submitted = True
