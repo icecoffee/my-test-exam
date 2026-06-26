@@ -193,7 +193,7 @@ else:
         def show_timer():
             if "start_time" in st.session_state:
                 elapsed = (datetime.now() - st.session_state.start_time).total_seconds()
-                remaining = (EXAM_DURATION_MINUTES * 60) - elapsed 
+                remaining = (EXAM_DURATION_MINUTES * 1) - elapsed 
                 timer_ph = st.empty()
                 if remaining > 0:
                     mins, secs = divmod(int(remaining), 60)
