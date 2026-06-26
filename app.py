@@ -15,8 +15,13 @@ CSV_USERS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=
 # ဆရာ့ရဲ့ Apps Script Web App URL အစစ်
 WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzIGCo5gvafmu4M2B9FEwEOichPdCDOLFmtmcsz9YaM0GzrG-DDe2u4HYVt3D66xeE9fg/exec"
 
-# 💡 [] စာမေးပွဲဖြေဆိုချိန် မိနစ် ကန့်သတ်ချက် (ဥပမာ - မိနစ် ၂၀ ဆိုလျှင် 20 ဟု ထည့်ပါ)
-EXAM_DURATION_MINUTES = 3
+# စာမေးပွဲဖြေဆိုချိန် မိနစ် ကန့်သတ်ချက် (မိနစ် ၂၀)
+EXAM_DURATION_MINUTES = 20
+
+# 💡 [CORE FIX] - မြန်မာစံတော်ချိန် (GMT +6:30) ကို လုံခြုံစိတ်ချစွာ ရယူသည့် သန့်စင်ပြီးသား Logic
+def get_mm_now():
+    # Server ၏ standard UTC အချိန်ကို ယူပြီး မြန်မာစံတော်ချိန်အတွက် ၆ နာရီ မိနစ် ၃၀ ကို တိုက်ရိုက် ပေါင်းစပ်တွက်ချက်သည်
+    return datetime.utcnow() + timedelta(hours=6, minutes=30)
 
 # --- GLOBAL LIVE MEMORY POOL FOR ADMIN VIEW ---
 if "global_results_pool" not in st.session_state:
@@ -72,7 +77,7 @@ def get_student_users_from_sheet():
     return base_users
 
 def save_result_to_sheet(username, score):
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    timestamp = get_mm_now().strftime("%Y-%m-%d %H:%M:%S")
     new_record = [timestamp, username, score]
     if new_record not in st.session_state.global_results_pool:
         st.session_state.global_results_pool.append(new_record)
@@ -80,7 +85,7 @@ def save_result_to_sheet(username, score):
     try:
         payload = json.dumps({"timestamp": timestamp, "username": username, "score": int(score)}).encode('utf-8')
         req = urllib.request.Request(WEB_APP_URL, data=payload, headers={'Content-Type': 'application/json'}, method='POST')
-        urllib.request.urlopen(req, timeout=2)
+        urllib.request.urlopen(req, timeout=3)
     except:
         pass
 
@@ -128,8 +133,7 @@ if not st.session_state.logged_in:
                     st.session_state.user_role = "student"
                     st.session_state.username = username
                     st.session_state.submitted = False
-                    # ကျောင်းသား Login အောင်မြင်ချိန်တွင် စတင်ဖြေဆိုသည့် အချိန်မှတ်သားရန်
-                    st.session_state.start_time = datetime.now()
+                    st.session_state.start_time = get_mm_now()
                     st.rerun()
             else:
                 st.error("Invalid credentials. Please try again.")
@@ -179,18 +183,16 @@ else:
         all_questions = get_questions_from_sheet()
         
         if not st.session_state.submitted:
-            # --- 💡 TIMER LOGIC ---
+            # --- TIMER LOGIC ---
             if "start_time" in st.session_state:
                 end_time = st.session_state.start_time + timedelta(minutes=EXAM_DURATION_MINUTES)
-                now = datetime.now()
+                now = get_mm_now()
                 remaining = end_time - now
                 seconds_left = int(remaining.total_seconds())
                 
-                # အချိန်စေ့သွားပါက အလိုအလျောက် သိမ်းဆည်းရန် Logic
                 if seconds_left <= 0:
                     st.error("⏳ အချိန်ပြည့်သွားပါပြီ။ သင်ရွေးချယ်ထားသမျှ အဖြေများကို စနစ်မှ အလိုအလျောက် သိမ်းဆည်းနေပါသည်...")
                     time.sleep(1)
-                    # လက်ရှိ ရမှတ်ကို တွက်ချက်ခြင်း
                     auto_score = 0
                     for i, q in enumerate(all_questions):
                         radio_key = f"q_{i}"
@@ -201,16 +203,14 @@ else:
                     st.session_state.final_score = auto_score
                     st.rerun()
                 
-                # Timer မျက်နှာပြင် ပြသခြင်း (Sidebar သို့မဟုတ် အပေါ်ဆုံးတွင် ထားနိုင်ပါသည်)
                 mins, secs = divmod(seconds_left, 60)
                 timer_text = f"⏳ ကျန်ရှိချိန် - {mins:02d}:{secs:02d}"
                 
                 if seconds_left < 60:
-                    st.sidebar.error(timer_text) # အချိန်စက္ကန့် ၆၀ အောက်လျော့ပါက အနီရောင်ပြပါမည်
+                    st.sidebar.error(timer_text)
                 else:
                     st.sidebar.warning(timer_text)
                     
-                # စက္ကန့်အလိုက် Live အချိန်ပြောင်းလဲရန် Auto-refresh စနစ်ထည့်သွင်းခြင်း
                 st.fragment(run_every=1.0)(lambda: None)()
             
             # --- QUESTIONS UI ---
