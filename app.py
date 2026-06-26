@@ -1,74 +1,47 @@
 import streamlit as st
 import pandas as pd
+import requests
+from datetime import datetime
 
-# 1. Configuration - Google Sheet ID (ဆရာ့ Sheet ID အမှန်ဖြစ်ပါစေ)
+# Google Sheet ID နှင့် လင့်ခ်များ
 SHEET_ID = "1ytBPXMKDwY2CY1hkEBxL6bCVwgr-GkmhzDFpvSVTIkA"
-URL_RESULTS = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Sheet1"
-URL_QUESTIONS = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Sheet2"
-URL_USERS = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Sheet3"
+CSV_RESULTS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Sheet1"
+CSV_QUESTIONS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Sheet2"
+CSV_USERS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Sheet3"
 
-# 2. Session State Initialization
+# Google Form Submission URL (ဆရာ့ Google Form ရဲ့ Response URL)
+GOOGLE_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSclK7tUfS_R52OaOunA-bE_P7m84_j9iU5RstWb7pAic9_U4A/formResponse"
+
+# --- LOGIN & STATE ---
 if "logged_in" not in st.session_state: st.session_state.logged_in = False
-if "role" not in st.session_state: st.session_state.role = None
-if "username" not in st.session_state: st.session_state.username = None
 
-# 3. Data Loading Functions (Cache ပိတ်ထားခြင်းဖြင့် Live data ပေါ်စေမည်)
-def load_data(url):
+# --- ADMIN PANEL (Google Sheet မှ ဖတ်ရန်) ---
+def show_admin():
+    st.title("👩‍🏫 Admin Control Panel")
+    if st.button("Refresh Records"): st.rerun()
     try:
-        return pd.read_csv(url)
+        # Sheet1 မှ အဖြေများကို ဖတ်ခြင်း
+        df = pd.read_csv(CSV_RESULTS_URL)
+        st.table(df)
     except:
-        return pd.DataFrame()
+        st.write("Record များ တင်ဆောင်နေသည်...")
 
-# 4. App Logic
+# --- STUDENT PANEL (Google Form သို့ ပို့ရန်) ---
+def show_student():
+    st.title("✍️ Exam Terminal")
+    username = st.session_state.username
+    st.write(f"User: {username}")
+    
+    # ဤနေရာတွင် မေးခွန်းများကို Google Form ပုံစံဖြင့် တိုက်ရိုက်ချိတ်ဆက်ဖြေဆိုခိုင်းပါ
+    st.markdown(f"[ဖြေဆိုရန် ဤနေရာကိုနှိပ်ပါ](https://docs.google.com/forms/d/e/1FAIpQLSclK7tUfS_R52OaOunA-bE_P7m84_j9iU5RstWb7pAic9_U4A/viewform?usp=pp_url&entry.12345={username})")
+
+# --- MAIN LOGIC ---
 if not st.session_state.logged_in:
-    st.title("🔐 Secure Exam Terminal")
-    df_users = load_data(URL_USERS)
-    
     user = st.text_input("Username")
-    pwd = st.text_input("Password", type="password")
-    
     if st.button("Login"):
-        # Admin Login
-        if user == "admin" and pwd == "admin123":
-            st.session_state.logged_in = True
-            st.session_state.role = "admin"
-            st.rerun()
-        # Student Login
-        elif not df_users.empty and user in df_users['Username'].values:
-            actual_pwd = str(df_users[df_users['Username'] == user]['Password'].values[0])
-            if str(pwd) == actual_pwd:
-                st.session_state.logged_in = True
-                st.session_state.role = "student"
-                st.session_state.username = user
-                st.rerun()
-            else:
-                st.error("Invalid Password!")
-        else:
-            st.error("Invalid Username!")
-
+        st.session_state.logged_in = True
+        st.session_state.username = user
+        st.rerun()
 else:
-    # --- ADMIN VIEW ---
-    if st.session_state.role == "admin":
-        st.title("👩‍🏫 Admin Control Panel")
-        if st.button("Log out"): st.session_state.logged_in = False; st.rerun()
-        if st.button("Refresh Results"): st.rerun()
-        # ဒေတာဇယားပြသခြင်း
-        df_res = load_data(URL_RESULTS)
-        st.table(df_res)
-    
-# --- STUDENT VIEW ---
-    else:
-        st.title(f"✍️ Welcome, {st.session_state.username}")
-        if st.button("Log out"): st.session_state.logged_in = False; st.rerun()
-        
-        # ဒေတာကို ဖတ်ပါ
-        questions = load_data(URL_QUESTIONS)
-        
-        # Debugging: ဒေတာဘာတွေပါလဲ စစ်ဆေးခြင်း
-        st.write("Debug: Loaded Questions Data:")
-        st.write(questions) # ဒီနေရာမှာ မေးခွန်းတွေ ပေါ်မလာရင် URL မှာ ပြဿနာရှိနေတာပါ
-        
-        if not questions.empty:
-            st.table(questions)
-        else:
-            st.warning("မေးခွန်းများ မတွေ့ရှိပါ။ Google Sheet link သို့မဟုတ် Sheet2 ကို ပြန်စစ်ပါ။")
+    if st.session_state.username == "admin": show_admin()
+    else: show_student()
