@@ -188,12 +188,14 @@ else:
         st.title("✍️ Student Examination Terminal")
         st.write(f"Active Session User: **{st.session_state.username}**")
         
-        # Timer လေးကို ဒီမှာပဲ အလုပ်လုပ်အောင် ထည့်ပေးထားပါတယ်
+       # Timer လေးကို ဒီအတိုင်းလေး ပြင်လိုက်ပါ
         @st.fragment(run_every=1.0)
         def show_timer():
             if "start_time" in st.session_state:
+                # 390min ပြဿနာဖြေရှင်းရန် datetime.now() ကိုပဲ တိုက်ရိုက်သုံးပါ
                 elapsed = (datetime.now() - st.session_state.start_time).total_seconds()
-                remaining = (EXAM_DURATION_MINUTES * 1) - elapsed 
+                remaining = (EXAM_DURATION_MINUTES * 60) - elapsed 
+                
                 timer_ph = st.empty()
                 if remaining > 0:
                     mins, secs = divmod(int(remaining), 60)
