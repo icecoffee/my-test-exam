@@ -12,11 +12,11 @@ CSV_RESULTS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tq
 CSV_QUESTIONS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Sheet2"
 CSV_USERS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Sheet3"
 
-# ဆရာ့ရဲ့ Apps Script Web App URL အစစ်
+# admin ရဲ့ Apps Script Web App URL
 WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwyFMXmqgLQyIx-kUN54Q5oVV4q8T1WJEvoksyo_EugBLAYeZ9SUQt35BpQF8pWMOmbcQ/exec"
 
-# စာမေးပွဲဖြေဆိုချိန် မိနစ် ကန့်သတ်ချက် (မိနစ် ၂၀)
-EXAM_DURATION_MINUTES = 20
+# စာမေးပွဲဖြေဆိုချိန် မိနစ် ကန့်သတ်ချက် (မိနစ် 5)
+EXAM_DURATION_MINUTES = 5
 
 # မြန်မာစံတော်ချိန် (GMT +6:30) ကို ရယူသည့် စနစ်
 def get_mm_now():
@@ -166,7 +166,7 @@ else:
             
             for r in db_data:
                 if len(r) >= 3 and str(r[0]).lower() != "timestamp":
-                    # အပြင်မှာ ပြသတဲ့အခါမှ ဆရာအလိုရှိတဲ့ "/စုစုပေါင်းမေးခွန်း" ပုံစံဖြင့် လှပအောင် တွဲပြပေးခြင်း
+                    # အပြင်မှာ ပြသတဲ့အခါမှ admin အလိုရှိတဲ့ "/စုစုပေါင်းမေးခွန်း" ပုံစံဖြင့် လှပအောင် တွဲပြပေးခြင်း
                     display_data.append({"Timestamp": r[0], "Student Username": r[1], "Score Obtained": f"{r[2]} Points"})
             
             for r in st.session_state.global_results_pool:
