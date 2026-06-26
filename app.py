@@ -183,56 +183,48 @@ else:
             st.subheader("Inject New Question to Pool Permanently")
             st.info("💡 ဤနေရာတွင် မေးခွန်းအသစ်များကို Google Sheet (Sheet2) ထဲသို့ တိုက်ရိုက်သွားရောက်တိုးပေးရပါမည်။")
                     
-  # --- STUDENT PANEL ---
+ # --- STUDENT PANEL ---
     elif st.session_state.user_role == "student":
         st.title("✍️ Student Examination Terminal")
         st.write(f"Active Session User: **{st.session_state.username}**")
         
+        # Timer လေးကို ဒီမှာပဲ အလုပ်လုပ်အောင် ထည့်ပေးထားပါတယ်
+        @st.fragment(run_every=1.0)
+        def show_timer():
+            if "start_time" in st.session_state:
+                elapsed = (datetime.now() - st.session_state.start_time).total_seconds()
+                remaining = (EXAM_DURATION_MINUTES * 60) - elapsed 
+                timer_ph = st.empty()
+                if remaining > 0:
+                    mins, secs = divmod(int(remaining), 60)
+                    timer_ph.warning(f"⏳ ကျန်ရှိချိန်: {mins:02d}:{secs:02d}")
+                else:
+                    timer_ph.error("⏰ အချိန်ကုန်သွားပါပြီ!")
+
         all_questions = get_questions_from_sheet()
         
-# --- Timer ကို Sidebar အစား စာမျက်နှာပေါ်တွင် ပြသရန် ---
-@st.fragment(run_every=1.0)
-def show_timer():
-    if "start_time" in st.session_state:
-        elapsed = (datetime.now() - st.session_state.start_time).total_seconds()
-        remaining = (EXAM_DURATION_MINUTES * 60) - elapsed 
-        
-        # st.sidebar အစား st.empty() ကို သုံး၍ စာမျက်နှာပေါ်တွင် ပြသပါ
-        timer_ph = st.empty() 
-        
-        if remaining > 0:
-            mins, secs = divmod(int(remaining), 60)
-            timer_ph.warning(f"⏳ ကျန်ရှိချိန်: {mins:02d}:{secs:02d}")
-        else:
-            timer_ph.error("⏰ အချိန်ကုန်သွားပါပြီ!")
-            # အချိန်ကုန်လျှင် အလိုအလျောက် Submit ဖြစ်စေရန် Logic ထည့်နိုင်ပါသည်
-
-        # 2. Logic စတင်ခြင်း
         if not st.session_state.submitted:
-            show_timer() # Timer ကို ဒီမှာ ခေါ်သုံးပါ
+            show_timer()
             
             if all_questions:
-                score = 0
                 user_answers = {}
-                
-                # QUESTIONS UI (Indentation ကို သေချာ ညီအောင်လုပ်ပေးထားပါတယ်)
                 for i, q in enumerate(all_questions):
                     st.markdown(f"##### Q{i+1}: {q['q']}")
                     user_answers[i] = st.radio(f"Select answer for Q{i+1}:", q['options'], index=None, key=f"q_{i}")
                     st.write("---")
                     
                 if st.button("Final Submit & Lock Account", type="primary"):
+                    score = 0
                     for i, q in enumerate(all_questions):
                         if i in user_answers and user_answers[i] is not None:
                             if str(user_answers[i]) == str(q['correct']):
                                 score += 1
-                    
                     save_result_to_sheet(st.session_state.username, score)
                     st.session_state.submitted = True
                     st.session_state.final_score = score
                     st.rerun()
             else:
-                st.warning("⚠️ မေးခွန်းများ Cloud တွင်းမှ ဆွဲယူနေဆဲ ဖြစ်ပါသည်။ ခေတ္တစောင့်ဆိုင်းပေးပါရန်။")
+                st.warning("⚠️ မေးခွန်းများ ဆွဲယူနေဆဲ ဖြစ်ပါသည်။")
         else:
             disp_score = st.session_state.final_score if 'final_score' in st.session_state else 0
             st.success(f"🎉 သင်၏ ရမှတ်မှာ {disp_score}/{len(all_questions)} ဖြစ်ပြီး စနစ်မှ သိမ်းဆည်းကာ Lock ချထားပြီး ဖြစ်ပါသည်။")
