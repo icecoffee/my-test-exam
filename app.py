@@ -245,7 +245,7 @@ if st.session_state.user:
     show_timer()
             
             # --- QUESTIONS UI ---
-            if all_questions:
+                if all_questions:
                 score = 0
                 user_answers = {}
                 
