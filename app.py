@@ -52,6 +52,7 @@ else:
     if st.session_state.role == "admin":
         st.title("👩‍🏫 Admin Control Panel")
         if st.button("Log out"): st.session_state.logged_in = False; st.rerun()
+        if st.button("Refresh Results"): st.rerun()
         st.table(load_data(URL_RESULTS))
     
     # --- STUDENT VIEW ---
@@ -61,6 +62,11 @@ else:
         
         questions = load_data(URL_QUESTIONS)
         if not questions.empty:
-            st.table(questions)
+            # အဖြေမှန် Column (Correct) ကို ဖျောက်ထားခြင်း
+            student_view = questions.drop(columns=['Correct'], errors='ignore')
+            st.table(student_view)
+            
+            st.write("---")
+            st.info("အဖြေကို Submit လုပ်ရန် အောက်ပါ အဖြေရွေးချယ်မှုများကို သုံးပါ (နောက်ဆုံးပြင်ဆင်မှုများ ထပ်ထည့်ရန် လိုအပ်ပါသည်)။")
         else:
             st.warning("မေးခွန်းများ တင်ဆောင်ရန် စောင့်ဆိုင်းနေပါသည်...")
