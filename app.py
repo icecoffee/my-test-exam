@@ -12,7 +12,7 @@ CSV_QUESTIONS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?
 CSV_USERS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Sheet3"
 
 # ဆရာ့ရဲ့ Apps Script Web App URL
-WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzIGCo5gvafmu4M2B9FEwEOichPdCDOLFmtmcsz9YaM0GzrG-DDe2u4HYVt3D66xeE9fg/exec"
+WEB_APP_URL = "https://script.google.com/macros/s/AKfycbykJcaxVeqF_QfxoZqtTX4dBEjDFbMoFoapaQsBCJSTO2T0lJBLIRumI8n6BASBLf_-Mw/exec"
 
 # --- GLOBAL LIVE MEMORY POOL FOR ADMIN VIEW ---
 if "global_results_pool" not in st.session_state:
