@@ -1,7 +1,24 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+import requests  # ကုဒ်ရဲ့ အပေါ်ဆုံး (Line 4) လောက်မှာ ထည့်ပေးပါ
 
+def save_result_to_sheet(username, score):
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    new_record = [timestamp, username, score]
+    
+    # အက်မင်ပန်နယ် ယာယီမှတ်တမ်းထဲ ထည့်ခြင်း
+    if new_record not in st.session_state.global_results_pool:
+        st.session_state.global_results_pool.append(new_record)
+        
+    # 💡 [https://script.google.com/macros/s/AKfycbzIGc05gvafmu4M2B9FEwEOicHdPCdOLfMtmcsz9YaMOGzrG-DDe2u4HYVt3D66eXE9fg/exec]
+    WEB_APP_URL = "https://script.google.com/macros/s/XXXXX/exec" 
+    
+    try:
+        payload = {"timestamp": timestamp, "username": username, "score": score}
+        requests.post(WEB_APP_URL, json=payload)
+    except:
+        pass
 # --- GOOGLE SHEET DATABASE CONNECTIVITY ---
 SHEET_ID = "1ytBPXMKDwY2CY1hkEBxL6bCVwgr-GkmhzDFpvSVTIkA"
 
