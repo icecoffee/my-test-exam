@@ -1,8 +1,9 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 import urllib.request
 import json
+import time
 
 # --- GOOGLE SHEET DATABASE CONNECTIVITY ---
 SHEET_ID = "1ytBPXMKDwY2CY1hkEBxL6bCVwgr-GkmhzDFpvSVTIkA"
@@ -11,8 +12,11 @@ CSV_RESULTS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tq
 CSV_QUESTIONS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Sheet2"
 CSV_USERS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Sheet3"
 
-# ဆရာ့ရဲ့ Apps Script Web App URL
-WEB_APP_URL = "https://script.google.com/macros/s/AKfycbykJcaxVeqF_QfxoZqtTX4dBEjDFbMoFoapaQsBCJSTO2T0lJBLIRumI8n6BASBLf_-Mw/exec"
+# ဆရာ့ရဲ့ Apps Script Web App URL အစစ်
+WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzIGCo5gvafmu4M2B9FEwEOichPdCDOLFmtmcsz9YaM0GzrG-DDe2u4HYVt3D66xeE9fg/exec"
+
+# 💡 [ပြင်ဆင်ရန်] စာမေးပွဲဖြေဆိုချိန် မိနစ် ကန့်သတ်ချက် (ဥပမာ - မိနစ် ၂၀ ဆိုလျှင် 20 ဟု ထည့်ပါ)
+EXAM_DURATION_MINUTES = 20
 
 # --- GLOBAL LIVE MEMORY POOL FOR ADMIN VIEW ---
 if "global_results_pool" not in st.session_state:
@@ -76,7 +80,7 @@ def save_result_to_sheet(username, score):
     try:
         payload = json.dumps({"timestamp": timestamp, "username": username, "score": int(score)}).encode('utf-8')
         req = urllib.request.Request(WEB_APP_URL, data=payload, headers={'Content-Type': 'application/json'}, method='POST')
-        urllib.request.urlopen(req, timeout=5)
+        urllib.request.urlopen(req, timeout=2)
     except:
         pass
 
@@ -97,14 +101,12 @@ if not st.session_state.logged_in:
     password = st.text_input("Password", type="password")
     
     if st.button("Secure Login", type="primary"):
-        # 💡 [ပြင်ဆင်ချက်] - Admin ကို Sheet ဒေတာများ မဖတ်မီ အပေါ်ဆုံးကနေ လုံးဝ သီးသန့် အရင်စစ်ထုတ်ပြီး ချက်ချင်းပေးဝင်လိုက်ပါသည်
         if username == "admin" and password == "admin123":
             st.session_state.logged_in = True
             st.session_state.user_role = "admin"
             st.session_state.username = "admin"
             st.rerun()
         else:
-            # ကျောင်းသားဖြစ်မှသာ Sheet ထဲက ဒေတာများကို လှမ်းယူစစ်ဆေးပါမည်
             valid_students = get_student_users_from_sheet()
             if username in valid_students and str(password).strip() == str(valid_students[username]).strip():
                 sheet_data = get_results_from_sheet()
@@ -126,6 +128,8 @@ if not st.session_state.logged_in:
                     st.session_state.user_role = "student"
                     st.session_state.username = username
                     st.session_state.submitted = False
+                    # ကျောင်းသား Login အောင်မြင်ချိန်တွင် စတင်ဖြေဆိုသည့် အချိန်မှတ်သားရန်
+                    st.session_state.start_time = datetime.now()
                     st.rerun()
             else:
                 st.error("Invalid credentials. Please try again.")
@@ -135,6 +139,7 @@ else:
         st.session_state.user_role = None
         st.session_state.username = None
         st.session_state.submitted = False
+        if "start_time" in st.session_state: del st.session_state.start_time
         st.rerun()
         
     # --- ADMIN PANEL ---
@@ -160,7 +165,7 @@ else:
             if display_data:
                 st.table(display_data)
             else:
-                st.info("ဖြေဆိုထားသော ကျောင်းသား မှတ်တမ်း မရှိသေးပါ။")
+                st.info("💡 ဖြေဆိုထားသော ကျောင်းသား မှတ်တမ်း မရှိသေးပါ။")
                 
         with tab2:
             st.subheader("Inject New Question to Pool Permanently")
@@ -174,6 +179,41 @@ else:
         all_questions = get_questions_from_sheet()
         
         if not st.session_state.submitted:
+            # --- 💡 TIMER LOGIC ---
+            if "start_time" in st.session_state:
+                end_time = st.session_state.start_time + timedelta(minutes=EXAM_DURATION_MINUTES)
+                now = datetime.now()
+                remaining = end_time - now
+                seconds_left = int(remaining.total_seconds())
+                
+                # အချိန်စေ့သွားပါက အလိုအလျောက် သိမ်းဆည်းရန် Logic
+                if seconds_left <= 0:
+                    st.error("⏳ အချိန်ပြည့်သွားပါပြီ။ သင်ရွေးချယ်ထားသမျှ အဖြေများကို စနစ်မှ အလိုအလျောက် သိမ်းဆည်းနေပါသည်...")
+                    time.sleep(1)
+                    # လက်ရှိ ရမှတ်ကို တွက်ချက်ခြင်း
+                    auto_score = 0
+                    for i, q in enumerate(all_questions):
+                        radio_key = f"q_{i}"
+                        if radio_key in st.session_state and st.session_state[radio_key] == q['correct']:
+                            auto_score += 1
+                    save_result_to_sheet(st.session_state.username, auto_score)
+                    st.session_state.submitted = True
+                    st.session_state.final_score = auto_score
+                    st.rerun()
+                
+                # Timer မျက်နှာပြင် ပြသခြင်း (Sidebar သို့မဟုတ် အပေါ်ဆုံးတွင် ထားနိုင်ပါသည်)
+                mins, secs = divmod(seconds_left, 60)
+                timer_text = f"⏳ ကျန်ရှိချိန် - {mins:02d}:{secs:02d}"
+                
+                if seconds_left < 60:
+                    st.sidebar.error(timer_text) # အချိန်စက္ကန့် ၆၀ အောက်လျော့ပါက အနီရောင်ပြပါမည်
+                else:
+                    st.sidebar.warning(timer_text)
+                    
+                # စက္ကန့်အလိုက် Live အချိန်ပြောင်းလဲရန် Auto-refresh စနစ်ထည့်သွင်းခြင်း
+                st.fragment(run_every=1.0)(lambda: None)()
+            
+            # --- QUESTIONS UI ---
             if all_questions:
                 score = 0
                 user_answers = {}
