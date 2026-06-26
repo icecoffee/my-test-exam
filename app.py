@@ -15,8 +15,8 @@ CSV_USERS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=
 # ဆရာ့ရဲ့ Apps Script Web App URL အစစ်
 WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzIGCo5gvafmu4M2B9FEwEOichPdCDOLFmtmcsz9YaM0GzrG-DDe2u4HYVt3D66xeE9fg/exec"
 
-# 💡 [ပြင်ဆင်ရန်] စာမေးပွဲဖြေဆိုချိန် မိနစ် ကန့်သတ်ချက် (ဥပမာ - မိနစ် ၂၀ ဆိုလျှင် 20 ဟု ထည့်ပါ)
-EXAM_DURATION_MINUTES = 20
+# 💡 [] စာမေးပွဲဖြေဆိုချိန် မိနစ် ကန့်သတ်ချက် (ဥပမာ - မိနစ် ၂၀ ဆိုလျှင် 20 ဟု ထည့်ပါ)
+EXAM_DURATION_MINUTES = 3
 
 # --- GLOBAL LIVE MEMORY POOL FOR ADMIN VIEW ---
 if "global_results_pool" not in st.session_state:
