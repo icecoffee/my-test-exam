@@ -247,14 +247,17 @@ else:
             disp_score = st.session_state.final_score if 'final_score' in st.session_state else 0
             st.success(f"🎉 သင်၏ ရမှတ်မှာ {disp_score}/{len(all_questions)} ဖြစ်ပြီး စနစ်မှ သိမ်းဆည်းကာ Lock ချထားပြီး ဖြစ်ပါသည်။")
             st.balloons()
-# --- ADMIN PANEL အပိုင်းမှာသာ ပေါ်စေရန် ပြင်ဆင်ခြင်း ---
+# --- ADMIN PANEL ---
     if st.session_state.user_role == "admin":
         st.title("👩‍🏫 Admin Control Panel (Secure Mode)")
         
+        # 💡 ခလုတ်တစ်ခုတည်းဖြင့် စနစ်တစ်ခုလုံးကို Reset ချခြင်း
         st.sidebar.subheader("⚙️ System Control")
-        # 💡 ဒီခလုတ်က Admin အကောင့်နဲ့ဝင်မှသာ Sidebar မှာ ပေါ်လာပါမယ်
         if st.sidebar.button("♻️ FULL SYSTEM RESET", type="primary"):
             st.session_state.global_results_pool = []
             if "submitted" in st.session_state: st.session_state.submitted = False
-            st.sidebar.success("Memory Pool & Lock System Cleared!")
+            st.sidebar.success("System Reset Successfully!")
             st.rerun()
+        
+        tab1, tab2 = st.tabs(["📝 View Results Logs", "➕ Add Secure Questions"])
+        # (ကျန်တဲ့ ကုဒ်များဆက်ရန်...)
