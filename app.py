@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 
-# 1. Configuration - Google Sheet ID
+# 1. Configuration - Google Sheet ID (ဆရာ့ Sheet ID အမှန်ဖြစ်ပါစေ)
 SHEET_ID = "1ytBPXMKDwY2CY1hkEBxL6bCVwgr-GkmhzDFpvSVTIkA"
 URL_RESULTS = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Sheet1"
 URL_QUESTIONS = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Sheet2"
@@ -12,8 +12,7 @@ if "logged_in" not in st.session_state: st.session_state.logged_in = False
 if "role" not in st.session_state: st.session_state.role = None
 if "username" not in st.session_state: st.session_state.username = None
 
-# 3. Data Loading Functions
-@st.cache_data(ttl=10)
+# 3. Data Loading Functions (Cache ပိတ်ထားခြင်းဖြင့် Live data ပေါ်စေမည်)
 def load_data(url):
     try:
         return pd.read_csv(url)
@@ -34,9 +33,9 @@ if not st.session_state.logged_in:
             st.session_state.logged_in = True
             st.session_state.role = "admin"
             st.rerun()
-        # Student Login (Sheet3 မှ စစ်ဆေးခြင်း)
+        # Student Login
         elif not df_users.empty and user in df_users['Username'].values:
-            actual_pwd = df_users[df_users['Username'] == user]['Password'].astype(str).values[0]
+            actual_pwd = str(df_users[df_users['Username'] == user]['Password'].values[0])
             if str(pwd) == actual_pwd:
                 st.session_state.logged_in = True
                 st.session_state.role = "student"
@@ -53,7 +52,9 @@ else:
         st.title("👩‍🏫 Admin Control Panel")
         if st.button("Log out"): st.session_state.logged_in = False; st.rerun()
         if st.button("Refresh Results"): st.rerun()
-        st.table(load_data(URL_RESULTS))
+        # ဒေတာဇယားပြသခြင်း
+        df_res = load_data(URL_RESULTS)
+        st.table(df_res)
     
     # --- STUDENT VIEW ---
     else:
@@ -67,6 +68,6 @@ else:
             st.table(student_view)
             
             st.write("---")
-            st.info("အဖြေကို Submit လုပ်ရန် အောက်ပါ အဖြေရွေးချယ်မှုများကို သုံးပါ (နောက်ဆုံးပြင်ဆင်မှုများ ထပ်ထည့်ရန် လိုအပ်ပါသည်)။")
+            st.info("အဖြေကို Submit လုပ်ရန် အောက်ပါ အဖြေရွေးချယ်မှုများကို သုံးပါ")
         else:
             st.warning("မေးခွန်းများ တင်ဆောင်ရန် စောင့်ဆိုင်းနေပါသည်...")
