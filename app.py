@@ -56,17 +56,21 @@ else:
         df_res = load_data(URL_RESULTS)
         st.table(df_res)
     
-    # --- STUDENT VIEW ---
+# --- STUDENT VIEW ---
     else:
         st.title(f"✍️ Welcome, {st.session_state.username}")
         if st.button("Log out"): st.session_state.logged_in = False; st.rerun()
         
         questions = load_data(URL_QUESTIONS)
+        
         if not questions.empty:
-            # အဖြေမှန် Column (Correct) ကို ဖျောက်ထားခြင်း
-            student_view = questions.drop(columns=['Correct'], errors='ignore')
-            st.table(student_view)
+            # အကယ်၍ 'Correct' column ရှိမှသာ drop လုပ်ပါ၊ မရှိရင် မလုပ်ပါနဲ့ (အမှားမတက်အောင်)
+            if 'Correct' in questions.columns:
+                student_view = questions.drop(columns=['Correct'])
+            else:
+                student_view = questions
             
+            st.table(student_view)
             st.write("---")
             st.info("အဖြေကို Submit လုပ်ရန် အောက်ပါ အဖြေရွေးချယ်မှုများကို သုံးပါ")
         else:
