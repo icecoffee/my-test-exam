@@ -183,72 +183,35 @@ else:
             st.subheader("Inject New Question to Pool Permanently")
             st.info("💡 ဤနေရာတွင် မေးခွန်းအသစ်များကို Google Sheet (Sheet2) ထဲသို့ တိုက်ရိုက်သွားရောက်တိုးပေးရပါမည်။")
                     
-    # --- STUDENT PANEL ---
+  # --- STUDENT PANEL ---
     elif st.session_state.user_role == "student":
         st.title("✍️ Student Examination Terminal")
         st.write(f"Active Session User: **{st.session_state.username}**")
         
         all_questions = get_questions_from_sheet()
         
-        if not st.session_state.submitted:
-            # --- TIMER LOGIC ---
+        # 1. Fragment ကို Function အနေနဲ့ အပေါ်မှာ သီးသန့် ရေးထားပါ (အောက်မှာ တစ်ခါတည်း သုံးပါ)
+        @st.fragment(run_every=1.0)
+        def show_timer():
             if "start_time" in st.session_state:
-                end_time = st.session_state.start_time + timedelta(minutes=EXAM_DURATION_MINUTES)
-                now = get_mm_now()
-                remaining = end_time - now
-                seconds_left = int(remaining.total_seconds())
-                
-                if seconds_left <= 0:
-                    st.error("⏳ အချိန်ပြည့်သွားပါပြီ။ သင်ရွေးချယ်ထားသမျှ အဖြေများကို စနစ်မှ အလိုအလျောက် သိမ်းဆည်းနေပါသည်...")
-                    time.sleep(1)
-                    auto_score = 0
-                    for i, q in enumerate(all_questions):
-                        radio_key = f"q_{i}"
-                        if radio_key in st.session_state and st.session_state[radio_key] == q['correct']:
-                            auto_score += 1
-                    save_result_to_sheet(st.session_state.username, auto_score)
-                    st.session_state.submitted = True
-                    st.session_state.final_score = auto_score
-                    st.rerun()
-                
-                mins, secs = divmod(seconds_left, 60)
-                timer_text = f"⏳ ကျန်ရှိချိန် - {mins:02d}:{secs:02d}"
-                
-             
-                
-                if seconds_left < 60:
-                    st.sidebar.error(timer_text)
+                elapsed = (datetime.now() - st.session_state.start_time).total_seconds()
+                remaining = (EXAM_DURATION_MINUTES * 60) - elapsed 
+                if remaining > 0:
+                    mins, secs = divmod(int(remaining), 60)
+                    st.sidebar.warning(f"⏳ ကျန်ရှိချိန်: {mins:02d}:{secs:02d}")
                 else:
-                    st.sidebar.warning(timer_text)
-                    
-               # --- ၁။ ဒီ Function ကို File ရဲ့ အပေါ်ပိုင်း (သို့) ကိုယ့်နေရာမှာ ထည့်ပါ ---
-@st.fragment(run_every=1.0)
-def show_timer():
-    if "start_time" in st.session_state:
-        # လက်ရှိအချိန်နဲ့ စတဲ့အချိန် နှိုင်းယှဉ်ခြင်း
-        elapsed = (datetime.now() - st.session_state.start_time).total_seconds()
-        remaining = (EXAM_DURATION_MINUTES * 3) - elapsed 
-        
-        if remaining > 0:
-            mins, secs = divmod(int(remaining), 60)
-            timer_text = f"⏳ ကျန်ရှိချိန်: {mins:02d}:{secs:02d}"
+                    st.sidebar.error("⏰ အချိန်ကုန်သွားပါပြီ!")
+                    # အချိန်ကုန်ရင် အလိုအလျောက် Submit ဖြစ်မယ့် Logic ကို ဒီမှာ ထည့်လို့ရပါတယ်
+
+        # 2. Logic စတင်ခြင်း
+        if not st.session_state.submitted:
+            show_timer() # Timer ကို ဒီမှာ ခေါ်သုံးပါ
             
-            if remaining < 60:
-                st.sidebar.error(timer_text)
-            else:
-                st.sidebar.warning(timer_text)
-        else:
-            st.sidebar.error("⏰ အချိန်ကုန်သွားပါပြီ!")
-            # အချိန်ကုန်ရင် အလိုအလျောက် Submit ဖြစ်အောင် ဒီမှာ ခေါ်သုံးနိုင်ပါတယ်
-            
-     if st.session_state.user:
-    show_timer()
-            
-            # --- QUESTIONS UI ---
-                if all_questions:
+            if all_questions:
                 score = 0
                 user_answers = {}
                 
+                # QUESTIONS UI (Indentation ကို သေချာ ညီအောင်လုပ်ပေးထားပါတယ်)
                 for i, q in enumerate(all_questions):
                     st.markdown(f"##### Q{i+1}: {q['q']}")
                     user_answers[i] = st.radio(f"Select answer for Q{i+1}:", q['options'], index=None, key=f"q_{i}")
@@ -270,4 +233,3 @@ def show_timer():
             disp_score = st.session_state.final_score if 'final_score' in st.session_state else 0
             st.success(f"🎉 သင်၏ ရမှတ်မှာ {disp_score}/{len(all_questions)} ဖြစ်ပြီး စနစ်မှ သိမ်းဆည်းကာ Lock ချထားပြီး ဖြစ်ပါသည်။")
             st.balloons()
-
