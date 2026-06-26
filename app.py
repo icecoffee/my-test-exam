@@ -5,9 +5,10 @@ from datetime import datetime
 # --- GOOGLE SHEET DATABASE CONNECTIVITY ---
 SHEET_ID = "1ytBPXMKDwY2CY1hkEBxL6bCVwgr-GkmhzDFpvSVTIkA"
 
-CSV_RESULTS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid=0"
-CSV_QUESTIONS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid=2071758052"
-CSV_USERS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&sheet=Sheet3"
+# 💡 [ပြင်ဆင်ချက်] - အမှားအယွင်းမရှိစေရန် ဂိဂ် (gid) နံပါတ်များအစား အသေချာဆုံး gviz စနစ်ဖြင့် Sheet နာမည်အတိုင်း တိုက်ရိုက်ခေါ်ယူထားပါသည်
+CSV_RESULTS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Sheet1"
+CSV_QUESTIONS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Sheet2"
+CSV_USERS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Sheet3"
 
 # --- GLOBAL LIVE MEMORY POOL FOR ADMIN VIEW ---
 if "global_results_pool" not in st.session_state:
@@ -21,13 +22,9 @@ def get_results_from_sheet():
         return []
 
 def get_questions_from_sheet():
-    default_questions = [
-        {"q": "Nuclear shielding matching: Which material is most effective for neutron attenuation?", "options": ["Lead (Pb)", "Water / Paraffin", "Aluminum (Al)", "Copper (Cu)"], "correct": "Water / Paraffin"},
-        {"q": "The 555 Timer IC operating in Astable mode produces which type of output waveform?", "options": ["Sine Wave", "Square Wave", "Triangular Wave", "Sawtooth Wave"], "correct": "Square Wave"}
-    ]
     try:
         df = pd.read_csv(CSV_QUESTIONS_URL)
-        if not df.empty:
+        if df is not None and not df.empty:
             sheet_questions = []
             for row in df.values.tolist():
                 if len(row) >= 6 and pd.notna(row[0]):
@@ -38,9 +35,14 @@ def get_questions_from_sheet():
                     })
             if sheet_questions:
                 return sheet_questions
-        return default_questions
     except:
-        return default_questions
+        pass
+        
+    # Backup Questions
+    return [
+        {"q": "Nuclear shielding matching: Which material is most effective for neutron attenuation?", "options": ["Lead (Pb)", "Water / Paraffin", "Aluminum (Al)", "Copper (Cu)"], "correct": "Water / Paraffin"},
+        {"q": "The 555 Timer IC operating in Astable mode produces which type of output waveform?", "options": ["Sine Wave", "Square Wave", "Triangular Wave", "Sawtooth Wave"], "correct": "Square Wave"}
+    ]
 
 def get_student_users_from_sheet():
     base_users = {
@@ -52,10 +54,17 @@ def get_student_users_from_sheet():
     }
     try:
         df = pd.read_csv(CSV_USERS_URL)
-        if not df.empty:
-            for row in df.values.tolist():
-                if len(row) >= 2 and pd.notna(row[0]) and pd.notna(row[1]):
-                    base_users[str(row[0]).strip()] = str(row[1]).strip()
+        if df is not None and not df.empty:
+            # Column Header များကို lowercase ပြောင်း၍ နေရာလွဲခြင်းမှ ကာကွယ်ပါသည်
+            df.columns = df.columns.str.strip()
+            
+            # Username နှင့် Password တိုင်များကို ရှာဖွေဖတ်ယူခြင်း
+            user_col = [c for c in df.columns if 'user' in c.lower()][0]
+            pwd_col = [c for c in df.columns if 'pass' in c.lower()][0]
+            
+            for _, row in df.iterrows():
+                if pd.notna(row[user_col]) and pd.notna(row[pwd_col]):
+                    base_users[str(row[user_col]).strip()] = str(row[pwd_col]).strip()
     except:
         pass
     return base_users
@@ -69,14 +78,10 @@ def save_result_to_sheet(username, score):
 # --- APP CONFIGURATION ---
 st.set_page_config(page_title="Secure Exam Terminal", page_icon="🔐", layout="centered")
 
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-if "user_role" not in st.session_state:
-    st.session_state.user_role = None
-if "username" not in st.session_state:
-    st.session_state.username = None
-if "submitted" not in st.session_state:
-    st.session_state.submitted = False
+if "logged_in" not in st.session_state: st.session_state.logged_in = False
+if "user_role" not in st.session_state: st.session_state.user_role = None
+if "username" not in st.session_state: st.session_state.username = None
+if "submitted" not in st.session_state: st.session_state.submitted = False
 
 all_questions = get_questions_from_sheet()
 valid_students = get_student_users_from_sheet()
@@ -126,7 +131,7 @@ else:
         st.session_state.submitted = False
         st.rerun()
         
-    # ADMIN PANEL
+    # --- ADMIN PANEL ---
     if st.session_state.user_role == "admin":
         st.title("👩‍🏫 Admin Control Panel (Secure Mode)")
         
@@ -134,12 +139,11 @@ else:
         
         with tab1:
             st.subheader("🔒 Terminal Live Records")
-            
             db_data = get_results_from_sheet()
             display_data = []
             
             for r in db_data:
-                if str(r[0]) != "Timestamp" and len(r) >= 3:
+                if len(r) >= 3 and str(r[0]).lower() != "timestamp":
                     display_data.append({"Timestamp": r[0], "Student Username": r[1], "Score Obtained": f"{r[2]} Points"})
             
             for r in st.session_state.global_results_pool:
@@ -154,17 +158,9 @@ else:
                 
         with tab2:
             st.subheader("Inject New Question to Pool Permanently")
-            new_q = st.text_input("Question Text")
-            opt1 = st.text_input("Option 1")
-            opt2 = st.text_input("Option 2")
-            opt3 = st.text_input("Option 3")
-            opt4 = st.text_input("Option 4")
-            correct_opt = st.selectbox("Correct Option", [opt1, opt2, opt3, opt4])
-            
-            if st.button("Inject into Question Pool"):
-                st.success("🎉 Question configuration simulation completed successfully!")
+            st.info("💡 ဤနေရာတွင် မေးခွန်းအသစ်များကို Google Sheet (Sheet2) ထဲသို့ တိုက်ရိုက်သွားရောက်တိုးပေးရပါမည်။")
                     
-    # STUDENT PANEL
+    # --- STUDENT PANEL ---
     elif st.session_state.user_role == "student":
         st.title("✍️ Student Examination Terminal")
         st.write(f"Active Session User: **{st.session_state.username}**")
@@ -174,10 +170,9 @@ else:
                 score = 0
                 user_answers = {}
                 
-                # --- [ဒီနေရာလေးတစ်ခုတည်းကိုပဲ ပြင်ဆင်ထားပါသည်] ---
-                # မေးခွန်းများကို Radio Button ဖြင့်ပြသပြီး အဖြေမှန် (Correct) ကို လုံးဝဖျောက်ထားပါသည်
+                # မေးခွန်းများကို Radio Button ဖြင့် ပြသပြီး အဖြေမှန် (Correct Column) ကို လုံးဝ ဖြတ်ထုတ်ထားပါသည်
                 for i, q in enumerate(all_questions):
-                    st.markdown(f"**Q{i+1}: {q['q']}**")
+                    st.markdown(f"##### Q{i+1}: {q['q']}")
                     user_answers[i] = st.radio(f"Select answer for Q{i+1}:", q['options'], key=f"q_{i}")
                     st.write("---")
                     
