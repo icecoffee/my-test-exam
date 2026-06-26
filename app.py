@@ -1,31 +1,18 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-import requests  # ကုဒ်ရဲ့ အပေါ်ဆုံး (Line 4) လောက်မှာ ထည့်ပေးပါ
+import urllib.request
+import json
 
-def save_result_to_sheet(username, score):
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    new_record = [timestamp, username, score]
-    
-    # အက်မင်ပန်နယ် ယာယီမှတ်တမ်းထဲ ထည့်ခြင်း
-    if new_record not in st.session_state.global_results_pool:
-        st.session_state.global_results_pool.append(new_record)
-        
-    # 💡 [https://script.google.com/macros/s/AKfycbzIGc05gvafmu4M2B9FEwEOicHdPCdOLfMtmcsz9YaMOGzrG-DDe2u4HYVt3D66eXE9fg/exec]
-    WEB_APP_URL = "https://script.google.com/macros/s/XXXXX/exec" 
-    
-    try:
-        payload = {"timestamp": timestamp, "username": username, "score": score}
-        requests.post(WEB_APP_URL, json=payload)
-    except:
-        pass
 # --- GOOGLE SHEET DATABASE CONNECTIVITY ---
 SHEET_ID = "1ytBPXMKDwY2CY1hkEBxL6bCVwgr-GkmhzDFpvSVTIkA"
 
-# 💡 [ပြင်ဆင်ချက်] - အမှားအယွင်းမရှိစေရန် ဂိဂ် (gid) နံပါတ်များအစား အသေချာဆုံး gviz စနစ်ဖြင့် Sheet နာမည်အတိုင်း တိုက်ရိုက်ခေါ်ယူထားပါသည်
 CSV_RESULTS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Sheet1"
 CSV_QUESTIONS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Sheet2"
 CSV_USERS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Sheet3"
+
+# 📝 ဆရာ့ရဲ့ Apps Script Web App URL အစစ်ကို ကုဒ်ထဲတွင် တိုက်ရိုက်ထည့်သွင်းပေးထားပါသည်
+WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzIGCo5gvafmu4M2B9FEwEOichPdCDOLFmtmcsz9YaM0GzrG-DDe2u4HYVt3D66xeE9fg/exec"
 
 # --- GLOBAL LIVE MEMORY POOL FOR ADMIN VIEW ---
 if "global_results_pool" not in st.session_state:
@@ -55,7 +42,6 @@ def get_questions_from_sheet():
     except:
         pass
         
-    # Backup Questions
     return [
         {"q": "Nuclear shielding matching: Which material is most effective for neutron attenuation?", "options": ["Lead (Pb)", "Water / Paraffin", "Aluminum (Al)", "Copper (Cu)"], "correct": "Water / Paraffin"},
         {"q": "The 555 Timer IC operating in Astable mode produces which type of output waveform?", "options": ["Sine Wave", "Square Wave", "Triangular Wave", "Sawtooth Wave"], "correct": "Square Wave"}
@@ -65,17 +51,12 @@ def get_student_users_from_sheet():
     base_users = {
         "student": "student123",
         "Roll1": "12345",
-        "Roll2": "12345",
-        "Roll3": "12345",
-        "Roll_01": "12345"
+        "Roll2": "12345"
     }
     try:
         df = pd.read_csv(CSV_USERS_URL)
         if df is not None and not df.empty:
-            # Column Header များကို lowercase ပြောင်း၍ နေရာလွဲခြင်းမှ ကာကွယ်ပါသည်
             df.columns = df.columns.str.strip()
-            
-            # Username နှင့် Password တိုင်များကို ရှာဖွေဖတ်ယူခြင်း
             user_col = [c for c in df.columns if 'user' in c.lower()][0]
             pwd_col = [c for c in df.columns if 'pass' in c.lower()][0]
             
@@ -91,6 +72,14 @@ def save_result_to_sheet(username, score):
     new_record = [timestamp, username, score]
     if new_record not in st.session_state.global_results_pool:
         st.session_state.global_results_pool.append(new_record)
+        
+    # Python အသင့်ပါစနစ်ဖြင့် Google Sheet သို့ ဒေတာပို့ခြင်း
+    try:
+        payload = json.dumps({"timestamp": timestamp, "username": username, "score": score}).encode('utf-8')
+        req = urllib.request.Request(WEB_APP_URL, data=payload, headers={'Content-Type': 'application/json'}, method='POST')
+        urllib.request.urlopen(req, timeout=5)
+    except:
+        pass
 
 # --- APP CONFIGURATION ---
 st.set_page_config(page_title="Secure Exam Terminal", page_icon="🔐", layout="centered")
@@ -99,9 +88,6 @@ if "logged_in" not in st.session_state: st.session_state.logged_in = False
 if "user_role" not in st.session_state: st.session_state.user_role = None
 if "username" not in st.session_state: st.session_state.username = None
 if "submitted" not in st.session_state: st.session_state.submitted = False
-
-all_questions = get_questions_from_sheet()
-valid_students = get_student_users_from_sheet()
 
 # --- UI LOGIC ---
 if not st.session_state.logged_in:
@@ -112,34 +98,37 @@ if not st.session_state.logged_in:
     password = st.text_input("Password", type="password")
     
     if st.button("Secure Login", type="primary"):
+        # Admin Login စစ်ဆေးမှု (Sheet အခြေအနေမရွေး အမြဲဝင်ရပါမည်)
         if username == "admin" and password == "admin123":
             st.session_state.logged_in = True
             st.session_state.user_role = "admin"
             st.session_state.username = "admin"
             st.rerun()
-        elif username in valid_students and str(password).strip() == str(valid_students[username]).strip():
-            sheet_data = get_results_from_sheet()
-            already_submitted = False
-            
-            for row in sheet_data:
-                if len(row) > 1 and str(row[1]) == username:
-                    already_submitted = True
-                    break
-            for r in st.session_state.global_results_pool:
-                if r[1] == username:
-                    already_submitted = True
-                    break
-            
-            if already_submitted:
-                st.error(f"❌ Access Denied: User '{username}' has already submitted the exam. Account Locked.")
-            else:
-                st.session_state.logged_in = True
-                st.session_state.user_role = "student"
-                st.session_state.username = username
-                st.session_state.submitted = False
-                st.rerun()
         else:
-            st.error("Invalid credentials. Please try again.")
+            valid_students = get_student_users_from_sheet()
+            if username in valid_students and str(password).strip() == str(valid_students[username]).strip():
+                sheet_data = get_results_from_sheet()
+                already_submitted = False
+                
+                for row in sheet_data:
+                    if len(row) > 1 and str(row[1]) == username:
+                        already_submitted = True
+                        break
+                for r in st.session_state.global_results_pool:
+                    if r[1] == username:
+                        already_submitted = True
+                        break
+                
+                if already_submitted:
+                    st.error(f"❌ Access Denied: User '{username}' has already submitted the exam. Account Locked.")
+                else:
+                    st.session_state.logged_in = True
+                    st.session_state.user_role = "student"
+                    st.session_state.username = username
+                    st.session_state.submitted = False
+                    st.rerun()
+            else:
+                st.error("Invalid credentials. Please try again.")
 else:
     if st.sidebar.button("Log Out"):
         st.session_state.logged_in = False
@@ -182,12 +171,13 @@ else:
         st.title("✍️ Student Examination Terminal")
         st.write(f"Active Session User: **{st.session_state.username}**")
         
+        all_questions = get_questions_from_sheet()
+        
         if not st.session_state.submitted:
             if all_questions:
                 score = 0
                 user_answers = {}
                 
-                # မေးခွန်းများကို Radio Button ဖြင့် ပြသပြီး အဖြေမှန် (Correct Column) ကို လုံးဝ ဖြတ်ထုတ်ထားပါသည်
                 for i, q in enumerate(all_questions):
                     st.markdown(f"##### Q{i+1}: {q['q']}")
                     user_answers[i] = st.radio(f"Select answer for Q{i+1}:", q['options'], key=f"q_{i}")
@@ -205,5 +195,5 @@ else:
             else:
                 st.warning("⚠️ မေးခွန်းများ Cloud တွင်းမှ ဆွဲယူနေဆဲ ဖြစ်ပါသည်။ ခေတ္တစောင့်ဆိုင်းပေးပါရန်။")
         else:
-            st.success(f"🎉 သင်၏ ရမှတ်မှာ {st.session_state.final_score}/{len(all_questions)} ဖြစ်ပြီး စနစ်မှ သိမ်းဆည်းကာ Lock ချထားပြီး ဖြစ်ပါသည်။")
+            st.success(f"🎉 သင်၏ ရမှတ်မှာ {st.session_score if 'final_score' in st.session_state else score}/{len(all_questions)} ဖြစ်ပြီး စနစ်မှ သိမ်းဆည်းကာ Lock ချထားပြီး ဖြစ်ပါသည်။")
             st.balloons()
