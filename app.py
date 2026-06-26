@@ -82,7 +82,8 @@ def save_result_to_sheet(username, score):
         st.session_state.global_results_pool.append(new_record)
         
     try:
-        payload = json.dumps({"timestamp": timestamp, "username": username, "score": str(score)}).encode('utf-8')
+        # 💡 [STABLE BACK] - Google Sheet မငြင်းဆန်စေရန် ရမှတ်ကို pure integer အဖြစ်သာ ပြန်ပြောင်းပို့ခြင်း
+        payload = json.dumps({"timestamp": timestamp, "username": username, "score": int(score)}).encode('utf-8')
         req = urllib.request.Request(WEB_APP_URL, data=payload, headers={'Content-Type': 'application/json'}, method='POST')
         urllib.request.urlopen(req, timeout=3)
     except:
@@ -165,10 +166,11 @@ else:
             
             for r in db_data:
                 if len(r) >= 3 and str(r[0]).lower() != "timestamp":
-                    display_data.append({"Timestamp": r[0], "Student Username": r[1], "Score Obtained": str(r[2])})
+                    # အပြင်မှာ ပြသတဲ့အခါမှ ဆရာအလိုရှိတဲ့ "/စုစုပေါင်းမေးခွန်း" ပုံစံဖြင့် လှပအောင် တွဲပြပေးခြင်း
+                    display_data.append({"Timestamp": r[0], "Student Username": r[1], "Score Obtained": f"{r[2]} Points"})
             
             for r in st.session_state.global_results_pool:
-                row_dict = {"Timestamp": r[0], "Student Username": r[1], "Score Obtained": str(r[2])}
+                row_dict = {"Timestamp": r[0], "Student Username": r[1], "Score Obtained": f"{r[2]} Points"}
                 if row_dict not in display_data:
                     display_data.append(row_dict)
             
@@ -204,7 +206,7 @@ else:
                         radio_key = f"q_{i}"
                         if radio_key in st.session_state and st.session_state[radio_key] == q['correct']:
                             auto_score += 1
-                    save_result_to_sheet(st.session_state.username, f"{auto_score}/{len(all_questions)}")
+                    save_result_to_sheet(st.session_state.username, auto_score)
                     st.session_state.submitted = True
                     st.session_state.final_score = auto_score
                     st.rerun()
@@ -231,13 +233,11 @@ else:
                     
                 if st.button("Final Submit & Lock Account", type="primary"):
                     for i, q in enumerate(all_questions):
-                        # 💡 [STABLE FIX] - ကျောင်းသားက အဖြေမရွေးဘဲ (None ဖြစ်ပြီး) ချန်ထားခဲ့လျှင်လည်း အမှားကင်းစွာ ကျော်ဖြတ်နိုင်ရန် ပြင်ဆင်ခြင်း
                         if i in user_answers and user_answers[i] is not None:
                             if str(user_answers[i]) == str(q['correct']):
                                 score += 1
                     
-                    formatted_score = f"{score}/{len(all_questions)}"
-                    save_result_to_sheet(st.session_state.username, formatted_score)
+                    save_result_to_sheet(st.session_state.username, score)
                     st.session_state.submitted = True
                     st.session_state.final_score = score
                     st.rerun()
