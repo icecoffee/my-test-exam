@@ -247,3 +247,10 @@ else:
             disp_score = st.session_state.final_score if 'final_score' in st.session_state else 0
             st.success(f"🎉 သင်၏ ရမှတ်မှာ {disp_score}/{len(all_questions)} ဖြစ်ပြီး စနစ်မှ သိမ်းဆည်းကာ Lock ချထားပြီး ဖြစ်ပါသည်။")
             st.balloons()
+# --- ADMIN PANEL အတွင်း Reboot ခလုတ်ကို အောက်ပါအတိုင်း ပြင်ဆင်ထည့်ပေးပါ ---
+        if st.sidebar.button("♻️ FULL SYSTEM RESET", type="primary"):
+            st.session_state.global_results_pool = [] # ယာယီ Memory အကုန်ရှင်း
+            # Session အသစ်အတွက် အကုန် ပြန်ချိန်ညှိ
+            if "submitted" in st.session_state: st.session_state.submitted = False
+            st.sidebar.success("Memory Pool & Lock System Cleared!")
+            st.rerun()
