@@ -18,9 +18,8 @@ WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzIGCo5gvafmu4M2B9FEwEOic
 # စာမေးပွဲဖြေဆိုချိန် မိနစ် ကန့်သတ်ချက် (မိနစ် ၂၀)
 EXAM_DURATION_MINUTES = 20
 
-# 💡 [CORE FIX] - မြန်မာစံတော်ချိန် (GMT +6:30) ကို လုံခြုံစိတ်ချစွာ ရယူသည့် သန့်စင်ပြီးသား Logic
+# မြန်မာစံတော်ချိန် (GMT +6:30) ကို ရယူသည့် စနစ်
 def get_mm_now():
-    # Server ၏ standard UTC အချိန်ကို ယူပြီး မြန်မာစံတော်ချိန်အတွက် ၆ နာရီ မိနစ် ၃၀ ကို တိုက်ရိုက် ပေါင်းစပ်တွက်ချက်သည်
     return datetime.utcnow() + timedelta(hours=6, minutes=30)
 
 # --- GLOBAL LIVE MEMORY POOL FOR ADMIN VIEW ---
@@ -149,6 +148,14 @@ else:
     # --- ADMIN PANEL ---
     if st.session_state.user_role == "admin":
         st.title("👩‍🏫 Admin Control Panel (Secure Mode)")
+        
+        # 💡 [ADMIN REBOOT SWITCH] - ဆရာ့အတွက် စနစ်ကို Reboot ချပေးမည့် ခလုတ်အသစ်
+        st.sidebar.subheader("⚙️ System Control")
+        if st.sidebar.button("♻️ Force Reboot System", type="secondary"):
+            st.session_state.global_results_pool = []
+            st.sidebar.success("Memory Pool Cleared Successfully!")
+            time.sleep(0.5)
+            st.rerun()
         
         tab1, tab2 = st.tabs(["📝 View Results Logs", "➕ Add Secure Questions"])
         
