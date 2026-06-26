@@ -11,7 +11,7 @@ CSV_RESULTS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tq
 CSV_QUESTIONS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Sheet2"
 CSV_USERS_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Sheet3"
 
-# 📝 ဆရာ့ရဲ့ Apps Script Web App URL အစစ်ကို ကုဒ်ထဲတွင် တိုက်ရိုက်ထည့်သွင်းပေးထားပါသည်
+# ဆရာ့ရဲ့ Apps Script Web App URL အစစ်
 WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzIGCo5gvafmu4M2B9FEwEOichPdCDOLFmtmcsz9YaM0GzrG-DDe2u4HYVt3D66xeE9fg/exec"
 
 # --- GLOBAL LIVE MEMORY POOL FOR ADMIN VIEW ---
@@ -73,9 +73,9 @@ def save_result_to_sheet(username, score):
     if new_record not in st.session_state.global_results_pool:
         st.session_state.global_results_pool.append(new_record)
         
-    # Python အသင့်ပါစနစ်ဖြင့် Google Sheet သို့ ဒေတာပို့ခြင်း
+    # Google Sheet သို့ ဒေတာပို့ခြင်း
     try:
-        payload = json.dumps({"timestamp": timestamp, "username": username, "score": score}).encode('utf-8')
+        payload = json.dumps({"timestamp": timestamp, "username": username, "score": int(score)}).encode('utf-8')
         req = urllib.request.Request(WEB_APP_URL, data=payload, headers={'Content-Type': 'application/json'}, method='POST')
         urllib.request.urlopen(req, timeout=5)
     except:
@@ -98,7 +98,7 @@ if not st.session_state.logged_in:
     password = st.text_input("Password", type="password")
     
     if st.button("Secure Login", type="primary"):
-        # Admin Login စစ်ဆေးမှု (Sheet အခြေအနေမရွေး အမြဲဝင်ရပါမည်)
+        # Admin အကောင့် စစ်ဆေးမှု
         if username == "admin" and password == "admin123":
             st.session_state.logged_in = True
             st.session_state.user_role = "admin"
@@ -195,5 +195,7 @@ else:
             else:
                 st.warning("⚠️ မေးခွန်းများ Cloud တွင်းမှ ဆွဲယူနေဆဲ ဖြစ်ပါသည်။ ခေတ္တစောင့်ဆိုင်းပေးပါရန်။")
         else:
-            st.success(f"🎉 သင်၏ ရမှတ်မှာ {st.session_score if 'final_score' in st.session_state else score}/{len(all_questions)} ဖြစ်ပြီး စနစ်မှ သိမ်းဆည်းကာ Lock ချထားပြီး ဖြစ်ပါသည်။")
+            # 💡 [ပြင်ဆင်ပြီး] စာလုံးပေါင်းမှားယွင်းမှု 'st.session_score' ကို 'st.session_state.final_score' သို့ ကွက်တိပြင်ဆင်ထားပါသည်
+            disp_score = st.session_state.final_score if 'final_score' in st.session_state else 0
+            st.success(f"🎉 သင်၏ ရမှတ်မှာ {disp_score}/{len(all_questions)} ဖြစ်ပြီး စနစ်မှ သိမ်းဆည်းကာ Lock ချထားပြီး ဖြစ်ပါသည်။")
             st.balloons()
