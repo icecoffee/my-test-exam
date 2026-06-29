@@ -100,7 +100,7 @@ if "submitted" not in st.session_state: st.session_state.submitted = False
 # --- UI LOGIC ---
 if not st.session_state.logged_in:
     st.title("🔐 Secure Online Examination System")
-    st.subheader("DCS Production Prototype (Dynamic Authentication Mode)")
+    st.subheader("DCS Production Prototype (DCS_Group_5)")
     
     username = st.text_input("Username (Case-sensitive)")
     password = st.text_input("Password", type="password")
